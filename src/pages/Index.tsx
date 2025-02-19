@@ -1,11 +1,19 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React from 'react';
+import ChatInterface from '../components/ChatInterface';
+import ResearchDashboard from '../components/ResearchDashboard';
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <div className="min-h-screen flex bg-background text-foreground">
+      {/* Left side - Chat Interface */}
+      <div className="w-1/2 border-r border-white/10 p-6">
+        <ChatInterface />
+      </div>
+      
+      {/* Right side - Research Dashboard */}
+      <div className="w-1/2">
+        <ResearchDashboard />
       </div>
     </div>
   );
