@@ -26,6 +26,9 @@ export interface ResearchSession {
   updated_at?: string;
   last_accessed_at?: string;
   tags?: ResearchTag[];
+  category?: ResearchCategory;
+  total_messages?: number;
+  total_citations?: number;
 }
 
 export interface Citation {
@@ -49,4 +52,20 @@ export interface ConversationSettings {
   max_tokens?: number;
   context_window?: number;
   custom_instructions?: string;
+}
+
+export interface SessionAnalytics {
+  total_messages: number;
+  total_citations: number;
+  last_activity: string;
+  topics: { name: string; count: number }[];
+  most_cited_sources: { title: string; count: number }[];
+}
+
+export interface SearchFilters {
+  categories?: string[];
+  tags?: string[];
+  status?: ResearchStatus[];
+  dateRange?: { from: string; to: string };
+  searchTerm?: string;
 }
