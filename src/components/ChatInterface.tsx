@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Settings, ChevronDown, Send, Save, Download } from 'lucide-react';
 import {
@@ -22,12 +21,6 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   metadata?: any;
-}
-
-interface ResearchSession {
-  id: string;
-  title: string;
-  description?: string;
 }
 
 const modelOptions = [
@@ -364,4 +357,3 @@ const ChatInterface = () => {
 };
 
 export default ChatInterface;
-
