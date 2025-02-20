@@ -16,7 +16,7 @@ export const ScreenshotCapture = ({ onAnalysisComplete }: ScreenshotCaptureProps
     try {
       setIsCapturing(true);
       
-      // Request screen capture without preferCurrentTab as it's not supported
+      // Request screen capture
       const stream = await navigator.mediaDevices.getDisplayMedia({ 
         video: { displaySurface: "browser" } 
       });
@@ -51,20 +51,29 @@ export const ScreenshotCapture = ({ onAnalysisComplete }: ScreenshotCaptureProps
         body: { image: imageBase64 }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Function error:', error);
+        throw error;
+      }
+
+      if (!data?.analysis) {
+        throw new Error('No analysis received from the model');
+      }
 
       onAnalysisComplete(data.analysis);
       
       toast({
         title: "Success",
         description: "Screenshot analyzed successfully",
+        duration: 3000,
       });
     } catch (error) {
       console.error('Error capturing screenshot:', error);
       toast({
         title: "Error",
-        description: "Failed to capture or analyze screenshot",
+        description: error instanceof Error ? error.message : "Failed to capture or analyze screenshot",
         variant: "destructive",
+        duration: 5000,
       });
     } finally {
       setIsCapturing(false);
@@ -78,8 +87,12 @@ export const ScreenshotCapture = ({ onAnalysisComplete }: ScreenshotCaptureProps
       onClick={captureAndAnalyze}
       disabled={isCapturing}
       title="Capture and analyze screen content"
+      className="relative"
     >
       <Camera className={`w-4 h-4 ${isCapturing ? 'animate-pulse' : ''}`} />
+      {isCapturing && (
+        <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+      )}
     </Button>
   );
 };
