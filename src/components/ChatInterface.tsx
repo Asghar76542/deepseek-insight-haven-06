@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Settings, ChevronDown, Send, Save, Download } from 'lucide-react';
 import {
@@ -10,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -48,7 +47,6 @@ const ChatInterface = () => {
 
   const initializeSession = async () => {
     try {
-      // Create a new research session
       const sessionId = uuidv4();
       const { data: session, error: sessionError } = await supabase
         .from('research_sessions')
@@ -64,7 +62,6 @@ const ChatInterface = () => {
 
       if (sessionError) throw sessionError;
 
-      // Create a new conversation
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
         .insert([
@@ -81,7 +78,6 @@ const ChatInterface = () => {
 
       setCurrentSession(session);
 
-      // Add initial greeting
       const initialMessage = {
         role: 'assistant' as const,
         content: `How can I help with your research today? I'm using ${selectedModel.name} from ${selectedModel.provider}.`,
@@ -119,7 +115,7 @@ const ChatInterface = () => {
       toast({
         title: "Warning",
         description: "Message saved locally but failed to sync",
-        variant: "warning",
+        variant: "default",
       });
     }
   };
@@ -133,7 +129,6 @@ const ChatInterface = () => {
       setMessages(prev => [...prev, userMessage]);
       setInput('');
 
-      // Save user message
       const { data: conversation } = await supabase
         .from('conversations')
         .select()
@@ -142,7 +137,6 @@ const ChatInterface = () => {
 
       await saveMessage(conversation.id, userMessage);
 
-      // Get AI response
       const { data, error } = await supabase.functions.invoke('chat-with-gemini', {
         body: { prompt: input }
       });
@@ -155,7 +149,6 @@ const ChatInterface = () => {
         metadata: { model: selectedModel.name, timestamp: new Date().toISOString() }
       };
 
-      // Save assistant message
       await saveMessage(conversation.id, assistantMessage);
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
@@ -258,9 +251,9 @@ const ChatInterface = () => {
           >
             <ReactMarkdown
               components={{
-                code({node, inline, className, children, ...props}) {
+                code({className, children, ...props}) {
                   const match = /language-(\w+)/.exec(className || '');
-                  return !inline && match ? (
+                  return match ? (
                     <SyntaxHighlighter
                       {...props}
                       style={materialDark}
