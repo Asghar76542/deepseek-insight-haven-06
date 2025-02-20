@@ -16,8 +16,11 @@ export const ScreenshotCapture = ({ onAnalysisComplete }: ScreenshotCaptureProps
     try {
       setIsCapturing(true);
       
-      // Request screen capture
-      const stream = await navigator.mediaDevices.getDisplayMedia({ preferCurrentTab: true });
+      // Request screen capture without preferCurrentTab as it's not supported
+      const stream = await navigator.mediaDevices.getDisplayMedia({ 
+        video: { displaySurface: "browser" } 
+      });
+      
       const video = document.createElement('video');
       video.srcObject = stream;
       
