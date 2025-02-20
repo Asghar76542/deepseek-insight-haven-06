@@ -9,6 +9,70 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      bookmarks: {
+        Row: {
+          created_at: string | null
+          id: string
+          message_id: string | null
+          note: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message_id?: string | null
+          note?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message_id?: string | null
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookmarks_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      citations: {
+        Row: {
+          citation_text: string | null
+          created_at: string | null
+          id: string
+          message_id: string | null
+          source_title: string | null
+          source_url: string | null
+        }
+        Insert: {
+          citation_text?: string | null
+          created_at?: string | null
+          id?: string
+          message_id?: string | null
+          source_title?: string | null
+          source_url?: string | null
+        }
+        Update: {
+          citation_text?: string | null
+          created_at?: string | null
+          id?: string
+          message_id?: string | null
+          source_title?: string | null
+          source_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "citations_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           created_at: string | null
@@ -16,6 +80,7 @@ export type Database = {
           model: string
           provider: string
           session_id: string | null
+          settings: Json | null
         }
         Insert: {
           created_at?: string | null
@@ -23,6 +88,7 @@ export type Database = {
           model: string
           provider: string
           session_id?: string | null
+          settings?: Json | null
         }
         Update: {
           created_at?: string | null
@@ -30,6 +96,7 @@ export type Database = {
           model?: string
           provider?: string
           session_id?: string | null
+          settings?: Json | null
         }
         Relationships: [
           {
@@ -79,29 +146,121 @@ export type Database = {
           },
         ]
       }
-      research_sessions: {
+      research_categories: {
         Row: {
+          color: string | null
           created_at: string | null
           description: string | null
           id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      research_sessions: {
+        Row: {
+          category_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_shared: boolean | null
+          last_accessed_at: string | null
+          status: Database["public"]["Enums"]["research_status"] | null
           title: string
           updated_at: string | null
         }
         Insert: {
+          category_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
+          is_shared?: boolean | null
+          last_accessed_at?: string | null
+          status?: Database["public"]["Enums"]["research_status"] | null
           title: string
           updated_at?: string | null
         }
         Update: {
+          category_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
+          is_shared?: boolean | null
+          last_accessed_at?: string | null
+          status?: Database["public"]["Enums"]["research_status"] | null
           title?: string
           updated_at?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "research_sessions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "research_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      research_tags: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
         Relationships: []
+      }
+      session_tags: {
+        Row: {
+          session_id: string
+          tag_id: string
+        }
+        Insert: {
+          session_id: string
+          tag_id: string
+        }
+        Update: {
+          session_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_tags_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "research_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "research_tags"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -111,7 +270,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      research_status: "active" | "archived" | "completed"
     }
     CompositeTypes: {
       [_ in never]: never

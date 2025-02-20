@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Settings, ChevronDown, Send, Save, Download } from 'lucide-react';
 import {
@@ -195,119 +194,158 @@ const ChatInterface = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleSelectSession = async (session: ResearchSession) => {
+    try {
+      const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('session_id', session.id)
+        .single();
+
+      if (convError) throw convError;
+
+      const { data: messages, error: messagesError } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversation.id)
+        .order('created_at');
+
+      if (messagesError) throw messagesError;
+
+      setCurrentSession(session);
+      setMessages(messages || []);
+    } catch (error) {
+      console.error('Error loading session:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load research session",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full">
-      <div className="glass-morphism p-4 rounded-t-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <MessageSquare className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">Research Assistant</h2>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={exportConversation}
-              title="Export Conversation"
-            >
-              <Download className="w-4 h-4" />
-            </Button>
+    <div className="flex h-full gap-4">
+      <div className="w-80 border-r p-4 overflow-y-auto">
+        <SessionManager
+          onSelectSession={handleSelectSession}
+          currentSessionId={currentSession?.id}
+        />
+      </div>
+      
+      <div className="flex-1 flex flex-col">
+        <div className="glass-morphism p-4 rounded-t-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">Research Assistant</h2>
+            </div>
             
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="gap-2">
-                  <Settings className="w-4 h-4" />
-                  {selectedModel.name}
-                  <ChevronDown className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[300px]">
-                {modelOptions.map((model) => (
-                  <DropdownMenuItem
-                    key={model.name}
-                    onClick={() => setSelectedModel(model)}
-                    className="flex flex-col items-start py-2 gap-1"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="font-medium">{model.name}</span>
-                      <span className="text-xs text-muted-foreground">{model.provider}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{model.description}</span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={exportConversation}
+                title="Export Conversation"
+              >
+                <Download className="w-4 h-4" />
+              </Button>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="gap-2">
+                    <Settings className="w-4 h-4" />
+                    {selectedModel.name}
+                    <ChevronDown className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[300px]">
+                  {modelOptions.map((model) => (
+                    <DropdownMenuItem
+                      key={model.name}
+                      onClick={() => setSelectedModel(model)}
+                      className="flex flex-col items-start py-2 gap-1"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-medium">{model.name}</span>
+                        <span className="text-xs text-muted-foreground">{model.provider}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{model.description}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`chat-bubble ${
-              message.role === 'assistant' ? 'bg-primary/20' : 'ml-auto bg-secondary/20'
-            } p-4 rounded-lg max-w-[80%]`}
-          >
-            <ReactMarkdown
-              components={{
-                code({className, children, ...props}) {
-                  const match = /language-(\w+)/.exec(className || '');
-                  return match ? (
-                    <SyntaxHighlighter
-                      {...props}
-                      style={materialDark}
-                      language={match[1]}
-                      PreTag="div"
-                    >
-                      {String(children).replace(/\n$/, '')}
-                    </SyntaxHighlighter>
-                  ) : (
-                    <code {...props} className={className}>
-                      {children}
-                    </code>
-                  );
-                }
-              }}
+        
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={`chat-bubble ${
+                message.role === 'assistant' ? 'bg-primary/20' : 'ml-auto bg-secondary/20'
+              } p-4 rounded-lg max-w-[80%]`}
             >
-              {message.content}
-            </ReactMarkdown>
-          </div>
-        ))}
-      </div>
-      
-      <div className="glass-morphism p-4 rounded-b-lg">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span>Model: {selectedModel.name}</span>
+              <ReactMarkdown
+                components={{
+                  code({className, children, ...props}) {
+                    const match = /language-(\w+)/.exec(className || '');
+                    return match ? (
+                      <SyntaxHighlighter
+                        {...props}
+                        style={materialDark}
+                        language={match[1]}
+                        PreTag="div"
+                      >
+                        {String(children).replace(/\n$/, '')}
+                      </SyntaxHighlighter>
+                    ) : (
+                      <code {...props} className={className}>
+                        {children}
+                      </code>
+                    );
+                  }
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
             </div>
-            <span>•</span>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-              <span>Provider: {selectedModel.provider}</span>
+          ))}
+        </div>
+        
+        <div className="glass-morphism p-4 rounded-b-lg">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <span>Model: {selectedModel.name}</span>
+              </div>
+              <span>•</span>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                <span>Provider: {selectedModel.provider}</span>
+              </div>
             </div>
-          </div>
-          
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your research query..."
-              className="flex-1 bg-background/50 rounded-lg px-4 py-2 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/50"
-              disabled={isLoading}
-            />
-            <Button 
-              className="glass-morphism hover:bg-primary/20"
-              onClick={handleSend}
-              disabled={isLoading}
-            >
-              {isLoading ? 'Thinking...' : <Send className="w-4 h-4" />}
-            </Button>
+            
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your research query..."
+                className="flex-1 bg-background/50 rounded-lg px-4 py-2 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                disabled={isLoading}
+              />
+              <Button 
+                className="glass-morphism hover:bg-primary/20"
+                onClick={handleSend}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Thinking...' : <Send className="w-4 h-4" />}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
