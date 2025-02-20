@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Settings, ChevronDown, Send, Save, Download } from 'lucide-react';
 import {
@@ -13,6 +14,8 @@ import { toast } from "@/hooks/use-toast";
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { SessionManager } from '@/components/SessionManager';
+import { ResearchSession } from '@/types/research';
 
 interface Message {
   id?: string;
@@ -204,7 +207,7 @@ const ChatInterface = () => {
 
       if (convError) throw convError;
 
-      const { data: messages, error: messagesError } = await supabase
+      const { data: messageData, error: messagesError } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conversation.id)
@@ -213,7 +216,14 @@ const ChatInterface = () => {
       if (messagesError) throw messagesError;
 
       setCurrentSession(session);
-      setMessages(messages || []);
+      // Convert the messages to the correct type
+      const typedMessages: Message[] = (messageData || []).map(msg => ({
+        id: msg.id,
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        metadata: msg.metadata
+      }));
+      setMessages(typedMessages);
     } catch (error) {
       console.error('Error loading session:', error);
       toast({
@@ -354,3 +364,4 @@ const ChatInterface = () => {
 };
 
 export default ChatInterface;
+

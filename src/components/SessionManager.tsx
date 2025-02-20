@@ -142,13 +142,15 @@ export const SessionManager = ({ onSelectSession, currentSessionId }: SessionMan
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Input
-            placeholder="Search sessions..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-64"
-            leftIcon={<Search className="w-4 h-4" />}
-          />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              placeholder="Search sessions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-64 pl-9"
+            />
+          </div>
           <Button variant="outline" size="icon">
             <Filter className="w-4 h-4" />
           </Button>
