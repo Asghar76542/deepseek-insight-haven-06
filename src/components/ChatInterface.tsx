@@ -14,6 +14,7 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { SessionManager } from '@/components/SessionManager';
+import { ScreenshotCapture } from '@/components/ScreenshotCapture';
 import { ResearchSession } from '@/types/research';
 
 interface Message {
@@ -209,7 +210,6 @@ const ChatInterface = () => {
       if (messagesError) throw messagesError;
 
       setCurrentSession(session);
-      // Convert the messages to the correct type
       const typedMessages: Message[] = (messageData || []).map(msg => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
@@ -224,6 +224,29 @@ const ChatInterface = () => {
         description: "Failed to load research session",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleScreenshotAnalysis = (analysis: string) => {
+    const assistantMessage = {
+      role: 'assistant' as const,
+      content: `📸 Screenshot Analysis:\n\n${analysis}`,
+      metadata: { type: 'screenshot_analysis', timestamp: new Date().toISOString() }
+    };
+    
+    setMessages(prev => [...prev, assistantMessage]);
+    
+    if (currentSession) {
+      supabase
+        .from('conversations')
+        .select()
+        .eq('session_id', currentSession.id)
+        .single()
+        .then(({ data: conversation }) => {
+          if (conversation) {
+            saveMessage(conversation.id, assistantMessage);
+          }
+        });
     }
   };
 
@@ -245,6 +268,7 @@ const ChatInterface = () => {
             </div>
             
             <div className="flex items-center gap-2">
+              <ScreenshotCapture onAnalysisComplete={handleScreenshotAnalysis} />
               <Button
                 variant="ghost"
                 size="icon"
