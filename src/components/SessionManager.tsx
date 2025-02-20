@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Plus, Filter, Search, Tag, FolderOpen, Calendar, ArrowUpDown } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -27,7 +26,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { ResearchSession, ResearchCategory, ResearchTag, SearchFilters } from '@/types/research';
+import { ResearchSession, ResearchCategory, ResearchTag, SearchFilters, ResearchStatus } from '@/types/research';
 import { toast } from "@/hooks/use-toast";
 
 interface SessionManagerProps {
@@ -70,7 +69,6 @@ export const SessionManager = ({ onSelectSession, currentSessionId }: SessionMan
           messages:conversations(count)
         `);
 
-      // Apply filters
       if (searchFilters.searchTerm) {
         query = query.ilike('title', `%${searchFilters.searchTerm}%`);
       }
@@ -87,14 +85,12 @@ export const SessionManager = ({ onSelectSession, currentSessionId }: SessionMan
         query = query.lte('created_at', searchFilters.dateRange.to);
       }
 
-      // Apply sorting
       query = query.order(sortField, { ascending: sortOrder === 'asc' });
 
       const { data, error } = await query;
 
       if (error) throw error;
 
-      // Process the sessions to include the message count
       const processedSessions = data.map(session => ({
         ...session,
         total_messages: session.messages?.length || 0,
@@ -153,7 +149,6 @@ export const SessionManager = ({ onSelectSession, currentSessionId }: SessionMan
 
       if (sessionError) throw sessionError;
 
-      // Add tags if selected
       if (newSessionData.tags.length > 0 && session) {
         const tagInserts = newSessionData.tags.map(tagId => ({
           session_id: session.id,
