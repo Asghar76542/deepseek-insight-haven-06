@@ -1,6 +1,10 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.1';
-import { corsHeaders } from '../_shared/cors.ts';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 interface ModelConfig {
   provider: string;
