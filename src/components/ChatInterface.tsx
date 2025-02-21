@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Settings, ChevronDown, Send, Save, Download } from 'lucide-react';
+import { MessageSquare, Settings, ChevronDown, Send, Save, Download, Pin, Edit, Star } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +21,13 @@ interface Message {
   id?: string;
   role: 'user' | 'assistant';
   content: string;
-  metadata?: any;
+  metadata?: {
+    isPinned?: boolean;
+    isEdited?: boolean;
+    editedAt?: string;
+    model?: string;
+    timestamp?: string;
+  };
 }
 
 const modelOptions = [
@@ -38,6 +43,8 @@ const ChatInterface = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentSession, setCurrentSession] = useState<ResearchSession | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
 
   useEffect(() => {
     initializeSession();
@@ -53,8 +60,8 @@ const ChatInterface = () => {
             id: sessionId,
             title: 'New Research Session',
             description: 'Research session started with ' + selectedModel.name,
-            status: 'active', // Add default status
-            is_shared: false  // Add default sharing status
+            status: 'active',
+            is_shared: false
           },
         ])
         .select()
@@ -253,6 +260,112 @@ const ChatInterface = () => {
     }
   };
 
+  const handleMessageAction = async (messageId: string | undefined, action: 'pin' | 'edit' | 'save') => {
+    if (!messageId) return;
+
+    try {
+      const messageIndex = messages.findIndex(m => m.id === messageId);
+      if (messageIndex === -1) return;
+
+      const message = messages[messageIndex];
+
+      switch (action) {
+        case 'pin':
+          const updatedMessage = {
+            ...message,
+            metadata: {
+              ...message.metadata,
+              isPinned: !message.metadata?.isPinned
+            }
+          };
+          
+          const newMessages = [...messages];
+          newMessages[messageIndex] = updatedMessage;
+          setMessages(newMessages);
+          
+          // Update in database
+          if (currentSession) {
+            const { data: conversation } = await supabase
+              .from('conversations')
+              .select()
+              .eq('session_id', currentSession.id)
+              .single();
+
+            if (conversation) {
+              await supabase
+                .from('messages')
+                .update({
+                  metadata: updatedMessage.metadata
+                })
+                .eq('id', messageId);
+            }
+          }
+          
+          toast({
+            title: updatedMessage.metadata?.isPinned ? "Message pinned" : "Message unpinned",
+            description: "The message has been updated",
+          });
+          break;
+
+        case 'edit':
+          setEditingMessageId(messageId);
+          setEditContent(message.content);
+          break;
+
+        case 'save':
+          if (!editContent.trim()) return;
+
+          const editedMessage = {
+            ...message,
+            content: editContent,
+            metadata: {
+              ...message.metadata,
+              isEdited: true,
+              editedAt: new Date().toISOString()
+            }
+          };
+
+          const updatedMessages = [...messages];
+          updatedMessages[messageIndex] = editedMessage;
+          setMessages(updatedMessages);
+          setEditingMessageId(null);
+          setEditContent('');
+
+          // Update in database
+          if (currentSession) {
+            const { data: conversation } = await supabase
+              .from('conversations')
+              .select()
+              .eq('session_id', currentSession.id)
+              .single();
+
+            if (conversation) {
+              await supabase
+                .from('messages')
+                .update({
+                  content: editContent,
+                  metadata: editedMessage.metadata
+                })
+                .eq('id', messageId);
+            }
+          }
+
+          toast({
+            title: "Message updated",
+            description: "Your changes have been saved",
+          });
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling message action:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update message",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="flex h-screen">
       {/* Left sidebar */}
@@ -315,33 +428,92 @@ const ChatInterface = () => {
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`chat-bubble ${
+              className={`chat-bubble relative ${
                 message.role === 'assistant' ? 'bg-primary/20' : 'ml-auto bg-secondary/20'
-              } p-4 rounded-lg max-w-[80%]`}
+              } p-4 rounded-lg max-w-[80%] ${message.metadata?.isPinned ? 'border-l-4 border-primary' : ''}`}
             >
-              <ReactMarkdown
-                components={{
-                  code({className, children, ...props}) {
-                    const match = /language-(\w+)/.exec(className || '');
-                    return match ? (
-                      <SyntaxHighlighter
-                        {...props}
-                        style={materialDark}
-                        language={match[1]}
-                        PreTag="div"
-                      >
-                        {String(children).replace(/\n$/, '')}
-                      </SyntaxHighlighter>
-                    ) : (
-                      <code {...props} className={className}>
-                        {children}
-                      </code>
-                    );
-                  }
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
+              <div className="absolute top-2 right-2 flex gap-2">
+                {message.id && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleMessageAction(message.id, 'pin')}
+                    >
+                      <Pin className={`w-4 h-4 ${message.metadata?.isPinned ? 'text-primary' : ''}`} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleMessageAction(message.id, 'edit')}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+              
+              {editingMessageId === message.id ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="w-full min-h-[100px] p-2 rounded bg-background/50 border focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingMessageId(null);
+                        setEditContent('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleMessageAction(message.id, 'save')}
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <ReactMarkdown
+                    components={{
+                      code({className, children, ...props}) {
+                        const match = /language-(\w+)/.exec(className || '');
+                        return match ? (
+                          <SyntaxHighlighter
+                            {...props}
+                            style={materialDark}
+                            language={match[1]}
+                            PreTag="div"
+                          >
+                            {String(children).replace(/\n$/, '')}
+                          </SyntaxHighlighter>
+                        ) : (
+                          <code {...props} className={className}>
+                            {children}
+                          </code>
+                        );
+                      }
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                  {message.metadata?.isEdited && (
+                    <div className="text-xs text-muted-foreground mt-2">
+                      Edited {new Date(message.metadata.editedAt!).toLocaleDateString()}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           ))}
         </div>
