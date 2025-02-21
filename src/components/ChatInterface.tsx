@@ -23,6 +23,7 @@ interface MessageMetadata {
   editedAt?: string;
   model?: string;
   timestamp?: string;
+  [key: string]: string | boolean | undefined;
 }
 
 interface Message {
@@ -106,17 +107,17 @@ const ChatInterface = () => {
 
   const saveMessage = async (conversationId: string, message: Message) => {
     try {
+      const messageData = {
+        conversation_id: conversationId,
+        role: message.role,
+        content: message.content,
+        model_name: selectedModel.name,
+        metadata: message.metadata || {}
+      };
+
       const { error } = await supabase
         .from('messages')
-        .insert([
-          {
-            conversation_id: conversationId,
-            role: message.role,
-            content: message.content,
-            model_name: selectedModel.name,
-            metadata: message.metadata || {},
-          },
-        ]);
+        .insert(messageData);
 
       if (error) throw error;
     } catch (error) {
