@@ -17,17 +17,19 @@ import { SessionManager } from '@/components/SessionManager';
 import { ScreenshotCapture } from '@/components/ScreenshotCapture';
 import { ResearchSession } from '@/types/research';
 
+interface MessageMetadata {
+  isPinned?: boolean;
+  isEdited?: boolean;
+  editedAt?: string;
+  model?: string;
+  timestamp?: string;
+}
+
 interface Message {
   id?: string;
   role: 'user' | 'assistant';
   content: string;
-  metadata?: {
-    isPinned?: boolean;
-    isEdited?: boolean;
-    editedAt?: string;
-    model?: string;
-    timestamp?: string;
-  };
+  metadata?: MessageMetadata;
 }
 
 const modelOptions = [
@@ -224,7 +226,7 @@ const ChatInterface = () => {
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
         content: msg.content,
-        metadata: msg.metadata
+        metadata: msg.metadata as MessageMetadata
       }));
       setMessages(typedMessages);
     } catch (error) {
