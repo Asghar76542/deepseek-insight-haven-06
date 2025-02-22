@@ -31,14 +31,17 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
   const fetchCitations = async () => {
     try {
-      const { data, error } = await supabase
+      const result = await supabase
         .from('citations')
         .select('*')
         .eq('session_id', sessionId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setCitations(data || []);
+      if (result.error) throw result.error;
+      
+      // Explicitly type the data as Citation[]
+      const citationsData = (result.data || []) as Citation[];
+      setCitations(citationsData);
     } catch (error) {
       console.error('Error fetching citations:', error);
       toast({
