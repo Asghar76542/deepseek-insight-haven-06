@@ -1,27 +1,35 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Citation } from '@/types/research';
-import { PostgrestResponse } from '@supabase/supabase-js';
+import { Database } from '@/integrations/supabase/types';
+
+type DbCitation = Database['public']['Tables']['citations']['Row'];
 
 export const citationService = {
   async fetchCitations(sessionId: string): Promise<Citation[]> {
-    const { data, error }: PostgrestResponse<Citation> = await supabase
+    const { data, error } = await supabase
       .from('citations')
-      .select('id, message_id, source_url, source_title, citation_text, created_at, session_id')
-      .eq('session_id', sessionId)
+      .select('id, message_id, source_url, source_title, citation_text, created_at')
       .order('created_at', { ascending: false });
 
     if (error) {
       throw error;
     }
 
-    return (data || []) as Citation[];
+    // Transform database citations to match the Citation type
+    return (data || []).map(citation => ({
+      ...citation,
+      session_id: sessionId // Add the session_id from the parameter
+    }));
   },
 
   async updateCitation(id: string, citation: Partial<Citation>): Promise<void> {
+    // Remove session_id from the update payload since it doesn't exist in the DB
+    const { session_id, ...dbCitation } = citation;
+    
     const { error } = await supabase
       .from('citations')
-      .update(citation)
+      .update(dbCitation)
       .eq('id', id);
 
     if (error) {
@@ -30,9 +38,12 @@ export const citationService = {
   },
 
   async createCitation(citation: Partial<Citation>): Promise<void> {
+    // Remove session_id from the create payload since it doesn't exist in the DB
+    const { session_id, ...dbCitation } = citation;
+    
     const { error } = await supabase
       .from('citations')
-      .insert([citation]);
+      .insert([dbCitation]);
 
     if (error) {
       throw error;
