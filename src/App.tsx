@@ -1,25 +1,34 @@
 
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
-import ChatInterface from "@/components/ChatInterface";
-import { ToolsPanel } from "@/components/tools/ToolsPanel";
+import Index from '@/pages/Index';
+import Auth from '@/pages/Auth';
+import NotFound from '@/pages/NotFound';
+import { AuthProvider } from '@/components/auth/AuthProvider';
+import { RequireAuth } from '@/components/auth/RequireAuth';
 
 function App() {
   return (
-    <TooltipProvider>
-      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-        <div className="min-h-screen bg-background">
-          <div className="flex h-screen">
-            <div className="flex-1">
-              <ChatInterface />
-            </div>
-            <ToolsPanel />
-          </div>
+    <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+      <Router>
+        <AuthProvider>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route
+              path="/"
+              element={
+                <RequireAuth>
+                  <Index />
+                </RequireAuth>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
           <Toaster />
-        </div>
-      </ThemeProvider>
-    </TooltipProvider>
+        </AuthProvider>
+      </Router>
+    </ThemeProvider>
   );
 }
 
