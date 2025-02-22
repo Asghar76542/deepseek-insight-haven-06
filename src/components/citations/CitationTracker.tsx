@@ -14,16 +14,19 @@ import { CitationForm } from './CitationForm';
 import { Citation } from '@/types/research';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import type { Database } from '@/integrations/supabase/types';
 
 interface CitationTrackerProps {
   sessionId: string;
 }
 
+type CitationType = Database['public']['Tables']['citations']['Row'];
+
 export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
-  const [citations, setCitations] = useState<Citation[]>([]);
+  const [citations, setCitations] = useState<CitationType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingCitation, setEditingCitation] = useState<Citation | null>(null);
+  const [editingCitation, setEditingCitation] = useState<CitationType | null>(null);
 
   useEffect(() => {
     fetchCitations();
@@ -49,7 +52,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
     }
   };
 
-  const handleSubmit = async (citationData: Partial<Citation>) => {
+  const handleSubmit = async (citationData: Partial<CitationType>) => {
     try {
       if (editingCitation?.id) {
         const { error } = await supabase
@@ -114,7 +117,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
     }
   };
 
-  const handleBookmark = async (citation: Citation) => {
+  const handleBookmark = async (citation: CitationType) => {
     try {
       const { error } = await supabase
         .from('bookmarks')
@@ -140,7 +143,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   };
 
   const filteredCitations = citations.filter(citation =>
-    citation.citation_text.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    citation.citation_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     citation.source_title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
