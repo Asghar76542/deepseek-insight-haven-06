@@ -13,7 +13,6 @@ import { CitationItem } from './CitationItem';
 import { CitationForm } from './CitationForm';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { PostgrestError } from '@supabase/supabase-js';
 
 interface CitationTrackerProps {
   sessionId: string;
@@ -28,7 +27,7 @@ interface Citation {
   created_at: string | null;
 }
 
-type CitationData = Omit<Citation, 'id' | 'created_at'>;
+type CitationInput = Omit<Citation, 'id' | 'created_at'>;
 
 export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   const [citations, setCitations] = useState<Citation[]>([]);
@@ -38,18 +37,16 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
   const fetchCitations = async () => {
     try {
-      type CitationResponse = {
-        data: Citation[] | null;
-        error: PostgrestError | null;
-      };
-
-      const { data, error }: CitationResponse = await supabase
+      const { data, error } = await supabase
         .from('citations')
-        .select('id, citation_text, source_title, source_url, message_id, created_at')
+        .select('*')
         .eq('session_id', sessionId);
 
-      if (error) throw error;
-      setCitations(data || []);
+      if (error) {
+        throw error;
+      }
+
+      setCitations(data as Citation[]);
     } catch (error) {
       console.error('Error fetching citations:', error);
       toast({
@@ -64,7 +61,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
     fetchCitations();
   }, [sessionId]);
 
-  const handleSubmit = async (citationData: Partial<CitationData>) => {
+  const handleSubmit = async (citationData: Partial<CitationInput>) => {
     try {
       if (editingCitation?.id) {
         const { error } = await supabase
