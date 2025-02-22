@@ -1,7 +1,7 @@
-
 import React, { useState } from 'react';
 import { Search, FileText, Database, Globe, Code, Settings } from 'lucide-react';
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { ToolCategory } from './ToolCategory';
 import { ToolItem } from './ToolItem';
 
