@@ -1,4 +1,3 @@
-
 export type ResearchStatus = 'active' | 'archived' | 'completed';
 
 export interface ResearchCategory {
@@ -33,18 +32,19 @@ export interface ResearchSession {
 
 export interface Citation {
   id: string;
-  message_id: string;
-  source_url?: string;
-  source_title?: string;
-  citation_text: string;
-  created_at?: string;
+  message_id: string | null;
+  source_url: string | null;
+  source_title: string | null;
+  citation_text: string | null;
+  created_at: string | null;
+  session_id?: string;
 }
 
 export interface Bookmark {
   id: string;
-  message_id: string;
-  note?: string;
-  created_at?: string;
+  message_id: string | null;
+  note: string | null;
+  created_at: string | null;
 }
 
 export interface ConversationSettings {
