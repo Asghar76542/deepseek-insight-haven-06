@@ -13,13 +13,12 @@ import { CitationItem } from './CitationItem';
 import { CitationForm } from './CitationForm';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Database } from '@/integrations/supabase/types';
 
 interface CitationTrackerProps {
   sessionId: string;
 }
 
-type CitationType = {
+interface CitationType {
   id: string;
   citation_text: string | null;
   source_title: string | null;
@@ -27,7 +26,7 @@ type CitationType = {
   message_id: string | null;
   created_at: string | null;
   session_id?: string;
-};
+}
 
 export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   const [citations, setCitations] = useState<CitationType[]>([]);
@@ -37,14 +36,14 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
   const fetchCitations = async () => {
     try {
-      const { data, error } = await supabase
+      const response = await supabase
         .from('citations')
-        .select('id, citation_text, source_title, source_url, message_id, created_at')
+        .select('id, citation_text, source_title, source_url, message_id, created_at, session_id')
         .eq('session_id', sessionId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setCitations(data || []);
+      if (response.error) throw response.error;
+      setCitations(response.data as CitationType[]);
     } catch (error) {
       console.error('Error fetching citations:', error);
       toast({
@@ -62,23 +61,23 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   const handleSubmit = async (citationData: Partial<CitationType>) => {
     try {
       if (editingCitation?.id) {
-        const { error } = await supabase
+        const response = await supabase
           .from('citations')
           .update(citationData)
           .eq('id', editingCitation.id);
 
-        if (error) throw error;
+        if (response.error) throw response.error;
 
         toast({
           title: "Success",
           description: "Citation updated successfully",
         });
       } else {
-        const { error } = await supabase
+        const response = await supabase
           .from('citations')
           .insert([{ ...citationData, session_id: sessionId }]);
 
-        if (error) throw error;
+        if (response.error) throw response.error;
 
         toast({
           title: "Success",
@@ -101,12 +100,12 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
+      const response = await supabase
         .from('citations')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (response.error) throw response.error;
 
       toast({
         title: "Success",
@@ -126,14 +125,14 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
   const handleBookmark = async (citation: CitationType) => {
     try {
-      const { error } = await supabase
+      const response = await supabase
         .from('bookmarks')
         .insert({
           message_id: citation.message_id,
           note: `Citation from: ${citation.source_title || 'Unknown source'}`
         });
 
-      if (error) throw error;
+      if (response.error) throw response.error;
 
       toast({
         title: "Success",
