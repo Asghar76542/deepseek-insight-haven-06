@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -12,19 +13,10 @@ import { CitationItem } from './CitationItem';
 import { CitationForm } from './CitationForm';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { Citation } from '@/types/research';
 
 interface CitationTrackerProps {
   sessionId: string;
-}
-
-interface Citation {
-  id: string;
-  citation_text: string | null;
-  source_title: string | null;
-  source_url: string | null;
-  message_id: string | null;
-  created_at: string | null;
-  session_id: string | null;
 }
 
 type CitationInput = Omit<Citation, 'id' | 'created_at'>;
@@ -39,9 +31,8 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
     try {
       const { data, error } = await supabase
         .from('citations')
-        .select('id, citation_text, source_title, source_url, message_id, created_at, session_id')
-        .eq('session_id', sessionId)
-        .returns<Citation[]>();
+        .select('*')
+        .eq('session_id', sessionId);
 
       if (error) throw error;
       setCitations(data || []);
@@ -196,10 +187,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
           <CitationItem
             key={citation.id}
             citation={citation}
-            onEdit={(citation) => {
-              setEditingCitation(citation);
-              setIsFormOpen(true);
-            }}
+            onEdit={setEditingCitation}
             onDelete={handleDelete}
             onBookmark={handleBookmark}
           />
