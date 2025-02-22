@@ -14,12 +14,14 @@ import { CitationForm } from './CitationForm';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Citation } from '@/types/research';
+import { Database } from '@/integrations/supabase/types';
 
 interface CitationTrackerProps {
   sessionId: string;
 }
 
 type CitationInput = Omit<Citation, 'id' | 'created_at'>;
+type DbCitation = Database['public']['Tables']['citations']['Row'];
 
 export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   const [citations, setCitations] = useState<Citation[]>([]);
@@ -33,13 +35,13 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
         .from('citations')
         .select()
         .eq('session_id', sessionId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as { data: DbCitation[] | null; error: any };
 
       if (error) {
         throw error;
       }
 
-      setCitations(data as Citation[]);
+      setCitations((data || []) as Citation[]);
     } catch (error) {
       console.error('Error fetching citations:', error);
       toast({
