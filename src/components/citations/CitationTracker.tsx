@@ -14,7 +14,6 @@ import { CitationForm } from './CitationForm';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Citation } from '@/types/research';
-import { PostgrestError } from '@supabase/supabase-js';
 
 interface CitationTrackerProps {
   sessionId: string;
@@ -30,16 +29,19 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
   const fetchCitations = async () => {
     try {
-      const result = await supabase
+      const { data, error } = await supabase
         .from('citations')
-        .select('*')
-        .eq('session_id', sessionId);
+        .select()
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: false });
 
-      if (result.error) throw result.error;
-      setCitations(result.data as Citation[]);
+      if (error) {
+        throw error;
+      }
+
+      setCitations(data as Citation[]);
     } catch (error) {
-      const pgError = error as PostgrestError;
-      console.error('Error fetching citations:', pgError);
+      console.error('Error fetching citations:', error);
       toast({
         title: "Error",
         description: "Failed to load citations",
