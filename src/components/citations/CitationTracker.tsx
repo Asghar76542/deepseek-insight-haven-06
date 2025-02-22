@@ -14,6 +14,7 @@ import { CitationForm } from './CitationForm';
 import { Citation } from '@/types/research';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { PostgrestSingleResponse } from '@supabase/supabase-js';
 
 interface CitationTrackerProps {
   sessionId: string;
@@ -31,17 +32,15 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
   const fetchCitations = async () => {
     try {
-      const result = await supabase
+      const { data, error } = await supabase
         .from('citations')
         .select('*')
         .eq('session_id', sessionId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .returns<Citation[]>();
 
-      if (result.error) throw result.error;
-      
-      // Explicitly type the data as Citation[]
-      const citationsData = (result.data || []) as Citation[];
-      setCitations(citationsData);
+      if (error) throw error;
+      setCitations(data || []);
     } catch (error) {
       console.error('Error fetching citations:', error);
       toast({
