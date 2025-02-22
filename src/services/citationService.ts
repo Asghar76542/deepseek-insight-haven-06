@@ -1,12 +1,13 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Citation } from '@/types/research';
+import { PostgrestResponse } from '@supabase/supabase-js';
 
 export const citationService = {
   async fetchCitations(sessionId: string): Promise<Citation[]> {
-    const { data, error } = await supabase
+    const { data, error }: PostgrestResponse<Citation> = await supabase
       .from('citations')
-      .select()
+      .select('id, message_id, source_url, source_title, citation_text, created_at, session_id')
       .eq('session_id', sessionId)
       .order('created_at', { ascending: false });
 
@@ -62,4 +63,3 @@ export const citationService = {
     }
   }
 };
-
