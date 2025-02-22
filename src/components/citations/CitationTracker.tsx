@@ -118,10 +118,10 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
     try {
       const { error } = await supabase
         .from('bookmarks')
-        .insert([{
-          citation_id: citation.id,
-          session_id: sessionId,
-        }]);
+        .insert({
+          message_id: citation.message_id,
+          note: `Citation from: ${citation.source_title || 'Unknown source'}`
+        });
 
       if (error) throw error;
 
