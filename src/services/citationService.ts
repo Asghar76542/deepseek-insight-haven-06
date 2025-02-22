@@ -17,9 +17,9 @@ export const citationService = {
     }
 
     // Transform database citations to match the Citation type
-    return (data || []).map(citation => ({
+    return (data || []).map((citation: DbCitation) => ({
       ...citation,
-      session_id: sessionId // Add the session_id from the parameter
+      session_id: sessionId
     }));
   },
 
@@ -38,7 +38,7 @@ export const citationService = {
   },
 
   async createCitation(citation: Partial<Citation>): Promise<void> {
-    // Remove session_id from the create payload since it doesn't exist in the DB
+    // Remove session_id from the update payload since it doesn't exist in the DB
     const { session_id, ...dbCitation } = citation;
     
     const { error } = await supabase
