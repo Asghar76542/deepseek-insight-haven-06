@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Search, FileText, Database, Globe, Code, Settings, 
@@ -9,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ToolCategory } from './ToolCategory';
 import { ToolItem } from './ToolItem';
+import { CitationTracker } from '../citations/CitationTracker';
 
 const toolCategories = [
   {
@@ -66,6 +66,8 @@ export const ToolsPanel = () => {
   const [openCategories, setOpenCategories] = useState<string[]>(['Research & Analysis']);
   const [activeTools, setActiveTools] = useState<string[]>([]);
   const [notifications, setNotifications] = useState(0);
+  const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   const toggleCategory = (categoryName: string) => {
     setOpenCategories(prev => 
@@ -90,6 +92,17 @@ export const ToolsPanel = () => {
       tool.description.toLowerCase().includes(searchTerm.toLowerCase())
     )
   })).filter(category => category.tools.length > 0);
+
+  const renderActiveTool = () => {
+    if (!activeTool || !currentSessionId) return null;
+
+    switch (activeTool) {
+      case 'Citation Tracker':
+        return <CitationTracker sessionId={currentSessionId} />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="w-80 border-l border-border bg-background flex flex-col h-full">
@@ -124,13 +137,19 @@ export const ToolsPanel = () => {
                 name={tool.name}
                 description={tool.description}
                 icon={tool.icon}
-                isActive={activeTools.includes(tool.name)}
-                onClick={() => toggleTool(tool.name)}
+                isActive={activeTool === tool.name}
+                onClick={() => {
+                  setActiveTool(tool.name === activeTool ? null : tool.name);
+                  if (tool.name === 'Citation Tracker' && currentSessionId) {
+                    // Handle citation tracker activation
+                  }
+                }}
               />
             ))}
           </ToolCategory>
         ))}
       </div>
+      {renderActiveTool()}
       <div className="p-4 border-t border-border">
         <Button variant="outline" className="w-full" onClick={() => {}}>
           <Settings className="w-4 h-4 mr-2" />
