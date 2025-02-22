@@ -13,20 +13,13 @@ import { CitationItem } from './CitationItem';
 import { CitationForm } from './CitationForm';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import type { Database } from '@/integrations/supabase/types';
 
 interface CitationTrackerProps {
   sessionId: string;
 }
 
-interface Citation {
-  id: string;
-  citation_text: string | null;
-  source_title: string | null;
-  source_url: string | null;
-  message_id: string | null;
-  created_at: string | null;
-}
-
+type Citation = Database['public']['Tables']['citations']['Row'];
 type CitationInput = Omit<Citation, 'id' | 'created_at'>;
 
 export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
@@ -36,25 +29,22 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   const [editingCitation, setEditingCitation] = useState<Citation | null>(null);
 
   const fetchCitations = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('citations')
-        .select('*')
-        .eq('session_id', sessionId);
+    const { data, error } = await supabase
+      .from('citations')
+      .select()
+      .eq('session_id', sessionId);
 
-      if (error) {
-        throw error;
-      }
-
-      setCitations(data as Citation[]);
-    } catch (error) {
+    if (error) {
       console.error('Error fetching citations:', error);
       toast({
         title: "Error",
         description: "Failed to load citations",
         variant: "destructive",
       });
+      return;
     }
+
+    setCitations(data || []);
   };
 
   useEffect(() => {
