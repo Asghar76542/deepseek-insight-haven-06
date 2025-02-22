@@ -1,9 +1,17 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Citation } from '@/types/research';
-import { Database } from '@/integrations/supabase/types';
 
-type CitationsResponse = Database['public']['Tables']['citations']['Row'];
+// Define a simple interface that matches our database structure
+interface DBCitation {
+  id: string;
+  message_id: string | null;
+  source_url: string | null;
+  source_title: string | null;
+  citation_text: string | null;
+  created_at: string | null;
+  session_id?: string;
+}
 
 export const citationService = {
   async fetchCitations(sessionId: string): Promise<Citation[]> {
