@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -13,14 +12,21 @@ import { CitationItem } from './CitationItem';
 import { CitationForm } from './CitationForm';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import type { Database } from '@/integrations/supabase/types';
 
 interface CitationTrackerProps {
   sessionId: string;
 }
 
-type CitationRow = Database['public']['Tables']['citations']['Row'];
-type Citation = CitationRow;
+interface Citation {
+  id: string;
+  citation_text: string | null;
+  source_title: string | null;
+  source_url: string | null;
+  message_id: string | null;
+  created_at: string | null;
+  session_id: string | null;
+}
+
 type CitationInput = Omit<Citation, 'id' | 'created_at'>;
 
 export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
@@ -30,22 +36,23 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   const [editingCitation, setEditingCitation] = useState<Citation | null>(null);
 
   const fetchCitations = async () => {
-    const { data, error } = await supabase
-      .from('citations')
-      .select('id, citation_text, source_title, source_url, message_id, created_at')
-      .eq('session_id', sessionId);
+    try {
+      const { data, error } = await supabase
+        .from('citations')
+        .select('id, citation_text, source_title, source_url, message_id, created_at, session_id')
+        .eq('session_id', sessionId)
+        .returns<Citation[]>();
 
-    if (error) {
+      if (error) throw error;
+      setCitations(data || []);
+    } catch (error) {
       console.error('Error fetching citations:', error);
       toast({
         title: "Error",
         description: "Failed to load citations",
         variant: "destructive",
       });
-      return;
     }
-
-    setCitations(data || []);
   };
 
   useEffect(() => {
