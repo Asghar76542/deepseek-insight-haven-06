@@ -1,20 +1,24 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Citation } from '@/types/research';
+import { Database } from '@/integrations/supabase/types';
+
+type CitationRow = Database['public']['Tables']['citations']['Row'];
 
 export const citationService = {
-  async fetchCitations(sessionId: string): Promise<Citation[]> {
+  async fetchCitations(sessionId: string) {
     const { data, error } = await supabase
       .from('citations')
-      .select()
+      .select('*')
       .eq('session_id', sessionId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .returns<CitationRow[]>();
 
     if (error) {
       throw error;
     }
 
-    return data || [];
+    return (data || []) as Citation[];
   },
 
   async updateCitation(id: string, citation: Partial<Citation>): Promise<void> {
