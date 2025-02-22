@@ -19,7 +19,8 @@ interface CitationTrackerProps {
   sessionId: string;
 }
 
-type Citation = Database['public']['Tables']['citations']['Row'];
+type CitationRow = Database['public']['Tables']['citations']['Row'];
+type Citation = CitationRow;
 type CitationInput = Omit<Citation, 'id' | 'created_at'>;
 
 export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
@@ -31,7 +32,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   const fetchCitations = async () => {
     const { data, error } = await supabase
       .from('citations')
-      .select()
+      .select('id, citation_text, source_title, source_url, message_id, created_at')
       .eq('session_id', sessionId);
 
     if (error) {
