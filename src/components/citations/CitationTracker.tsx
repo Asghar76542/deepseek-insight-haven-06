@@ -19,8 +19,15 @@ interface CitationTrackerProps {
   sessionId: string;
 }
 
-// Use exact table type from Database type
-type CitationType = Database['public']['Tables']['citations']['Row'];
+type CitationType = {
+  id: string;
+  citation_text: string | null;
+  source_title: string | null;
+  source_url: string | null;
+  message_id: string | null;
+  created_at: string | null;
+  session_id?: string;
+};
 
 export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   const [citations, setCitations] = useState<CitationType[]>([]);
@@ -30,13 +37,11 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
   const fetchCitations = async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('citations')
         .select('id, citation_text, source_title, source_url, message_id, created_at')
         .eq('session_id', sessionId)
         .order('created_at', { ascending: false });
-
-      const { data, error } = await query;
 
       if (error) throw error;
       setCitations(data || []);
