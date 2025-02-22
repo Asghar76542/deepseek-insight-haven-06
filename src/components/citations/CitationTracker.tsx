@@ -14,17 +14,19 @@ import { CitationForm } from './CitationForm';
 import { Citation } from '@/types/research';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { PostgrestSingleResponse } from '@supabase/supabase-js';
+import { Database } from '@/integrations/supabase/types';
 
 interface CitationTrackerProps {
   sessionId: string;
 }
 
+type DbCitation = Database['public']['Tables']['citations']['Row'];
+
 export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
-  const [citations, setCitations] = useState<Citation[]>([]);
+  const [citations, setCitations] = useState<DbCitation[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingCitation, setEditingCitation] = useState<Citation | null>(null);
+  const [editingCitation, setEditingCitation] = useState<DbCitation | null>(null);
 
   useEffect(() => {
     fetchCitations();
@@ -36,8 +38,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
         .from('citations')
         .select('*')
         .eq('session_id', sessionId)
-        .order('created_at', { ascending: false })
-        .returns<Citation[]>();
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setCitations(data || []);
@@ -51,7 +52,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
     }
   };
 
-  const handleSubmit = async (citationData: Partial<Citation>) => {
+  const handleSubmit = async (citationData: Partial<DbCitation>) => {
     try {
       if (editingCitation?.id) {
         const { error } = await supabase
@@ -116,7 +117,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
     }
   };
 
-  const handleBookmark = async (citation: Citation) => {
+  const handleBookmark = async (citation: DbCitation) => {
     try {
       const { error } = await supabase
         .from('bookmarks')
