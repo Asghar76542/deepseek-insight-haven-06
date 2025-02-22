@@ -1,20 +1,31 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Citation } from '@/types/research';
+import { PostgrestSingleResponse } from '@supabase/supabase-js';
+
+type CitationRecord = {
+  id: string;
+  message_id: string | null;
+  source_url: string | null;
+  source_title: string | null;
+  citation_text: string | null;
+  created_at: string | null;
+  session_id?: string;
+}
 
 export const citationService = {
   async fetchCitations(sessionId: string): Promise<Citation[]> {
-    const response = await supabase
+    const { data, error }: PostgrestSingleResponse<CitationRecord[]> = await supabase
       .from('citations')
-      .select()
+      .select('*')
       .eq('session_id', sessionId)
       .order('created_at', { ascending: false });
 
-    if (response.error) {
-      throw response.error;
+    if (error) {
+      throw error;
     }
 
-    return response.data as Citation[] ?? [];
+    return data || [];
   },
 
   async updateCitation(id: string, citation: Partial<Citation>): Promise<void> {
