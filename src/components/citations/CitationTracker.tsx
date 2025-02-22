@@ -18,32 +18,30 @@ interface CitationTrackerProps {
   sessionId: string;
 }
 
-interface CitationType {
+interface Citation {
   id: string;
   citation_text: string | null;
   source_title: string | null;
   source_url: string | null;
   message_id: string | null;
   created_at: string | null;
-  session_id?: string;
 }
 
 export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
-  const [citations, setCitations] = useState<CitationType[]>([]);
+  const [citations, setCitations] = useState<Citation[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingCitation, setEditingCitation] = useState<CitationType | null>(null);
+  const [editingCitation, setEditingCitation] = useState<Citation | null>(null);
 
   const fetchCitations = async () => {
     try {
-      const response = await supabase
+      const { data, error } = await supabase
         .from('citations')
-        .select('id, citation_text, source_title, source_url, message_id, created_at, session_id')
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: false });
+        .select('id, citation_text, source_title, source_url, message_id, created_at')
+        .eq('session_id', sessionId);
 
-      if (response.error) throw response.error;
-      setCitations(response.data as CitationType[]);
+      if (error) throw error;
+      setCitations(data || []);
     } catch (error) {
       console.error('Error fetching citations:', error);
       toast({
@@ -58,26 +56,37 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
     fetchCitations();
   }, [sessionId]);
 
-  const handleSubmit = async (citationData: Partial<CitationType>) => {
+  const handleSubmit = async (citationData: Partial<Citation>) => {
     try {
       if (editingCitation?.id) {
-        const response = await supabase
+        const { error } = await supabase
           .from('citations')
-          .update(citationData)
+          .update({
+            citation_text: citationData.citation_text,
+            source_title: citationData.source_title,
+            source_url: citationData.source_url,
+            message_id: citationData.message_id
+          })
           .eq('id', editingCitation.id);
 
-        if (response.error) throw response.error;
+        if (error) throw error;
 
         toast({
           title: "Success",
           description: "Citation updated successfully",
         });
       } else {
-        const response = await supabase
+        const { error } = await supabase
           .from('citations')
-          .insert([{ ...citationData, session_id: sessionId }]);
+          .insert([{
+            citation_text: citationData.citation_text,
+            source_title: citationData.source_title,
+            source_url: citationData.source_url,
+            message_id: citationData.message_id,
+            session_id: sessionId
+          }]);
 
-        if (response.error) throw response.error;
+        if (error) throw error;
 
         toast({
           title: "Success",
@@ -100,12 +109,12 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
   const handleDelete = async (id: string) => {
     try {
-      const response = await supabase
+      const { error } = await supabase
         .from('citations')
         .delete()
         .eq('id', id);
 
-      if (response.error) throw response.error;
+      if (error) throw error;
 
       toast({
         title: "Success",
@@ -123,16 +132,16 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
     }
   };
 
-  const handleBookmark = async (citation: CitationType) => {
+  const handleBookmark = async (citation: Citation) => {
     try {
-      const response = await supabase
+      const { error } = await supabase
         .from('bookmarks')
         .insert({
           message_id: citation.message_id,
           note: `Citation from: ${citation.source_title || 'Unknown source'}`
         });
 
-      if (response.error) throw response.error;
+      if (error) throw error;
 
       toast({
         title: "Success",
