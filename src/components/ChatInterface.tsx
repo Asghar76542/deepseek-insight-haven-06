@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Settings, ChevronDown, Send, Save, Download, Pin, Edit, Star, Brain, MonitorSmartphone, BarChart3 } from 'lucide-react';
+import { MessageSquare, Settings, ChevronDown, Send, Save, Download, Pin, Edit, Star, Brain, MonitorSmartphone, BarChart3, Code, Quote, List } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -112,6 +111,8 @@ const ChatInterface = () => {
     outputTokens: 0,
     totalCost: 0
   });
+  const [streamingContent, setStreamingContent] = useState<string>('');
+  const [isStreaming, setIsStreaming] = useState(false);
 
   useEffect(() => {
     initializeSession();
@@ -209,6 +210,7 @@ const ChatInterface = () => {
 
     try {
       setIsLoading(true);
+      setIsStreaming(true);
       const inputMetrics = calculateTokenMetrics(input);
       
       const userMessage: Message = {
@@ -226,6 +228,7 @@ const ChatInterface = () => {
 
       setMessages(prev => [...prev, userMessage]);
       setInput('');
+      setStreamingContent('');
 
       const { data: conversation } = await supabase
         .from('conversations')
@@ -235,13 +238,28 @@ const ChatInterface = () => {
 
       await saveMessage(conversation.id, userMessage);
 
-      const { data, error } = await supabase.functions.invoke('chat-with-gemini', {
-        body: { prompt: input }
+      const response = await fetch('/api/chat-with-gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: input }),
       });
 
-      if (error) throw error;
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      const outputMetrics = calculateTokenMetrics(data.generatedText);
+      if (!reader) throw new Error('No reader available');
+
+      let accumulatedContent = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value);
+        accumulatedContent += chunk;
+        setStreamingContent(accumulatedContent);
+      }
+
+      const outputMetrics = calculateTokenMetrics(accumulatedContent);
       const newTotalMetrics = {
         inputTokens: totalTokens.inputTokens + inputMetrics.inputTokens,
         outputTokens: totalTokens.outputTokens + outputMetrics.inputTokens,
@@ -252,7 +270,7 @@ const ChatInterface = () => {
 
       const assistantMessage: Message = {
         role: 'assistant',
-        content: data.generatedText,
+        content: accumulatedContent,
         metadata: {
           model: selectedModel.name,
           timestamp: new Date().toISOString(),
@@ -277,6 +295,8 @@ const ChatInterface = () => {
       });
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
+      setStreamingContent('');
     }
   };
 
@@ -480,7 +500,7 @@ const ChatInterface = () => {
         message.role === 'assistant' 
           ? 'bg-primary/10 border border-primary/20' 
           : 'ml-auto bg-secondary/20'
-      } p-4 rounded-lg max-w-[80%] ${message.metadata?.isPinned ? 'border-l-4 border-primary' : ''}`}
+      } p-4 rounded-lg max-w-[80%] ${message.metadata?.isPinned ? 'border-l-4 border-primary' : ''} animate-fade-in`}
     >
       {message.role === 'assistant' && (
         <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
@@ -534,19 +554,41 @@ const ChatInterface = () => {
         <>
           <ReactMarkdown
             components={{
-              code({className, children, ...props}) {
+              h1: ({ children }) => <h1 className="text-2xl font-bold mb-4 mt-6">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-xl font-bold mb-3 mt-5">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-lg font-bold mb-2 mt-4">{children}</h3>,
+              p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>,
+              li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+              blockquote: ({ children }) => (
+                <blockquote className="border-l-4 border-primary/30 pl-4 italic my-4">
+                  {children}
+                </blockquote>
+              ),
+              code: ({ className, children, ...props }) => {
                 const match = /language-(\w+)/.exec(className || '');
                 return match ? (
-                  <SyntaxHighlighter
-                    {...props}
-                    style={materialDark}
-                    language={match[1]}
-                    PreTag="div"
-                  >
-                    {String(children).replace(/\n$/, '')}
-                  </SyntaxHighlighter>
+                  <div className="relative group">
+                    <button
+                      onClick={() => navigator.clipboard.writeText(String(children))}
+                      className="absolute right-2 top-2 p-1 rounded bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Copy code"
+                    >
+                      <Code className="w-4 h-4" />
+                    </button>
+                    <SyntaxHighlighter
+                      {...props}
+                      style={materialDark}
+                      language={match[1]}
+                      PreTag="div"
+                      className="rounded-lg !mt-2 !mb-4"
+                    >
+                      {String(children).replace(/\n$/, '')}
+                    </SyntaxHighlighter>
+                  </div>
                 ) : (
-                  <code {...props} className={className}>
+                  <code {...props} className="bg-primary/10 rounded px-1.5 py-0.5">
                     {children}
                   </code>
                 );
@@ -644,6 +686,62 @@ const ChatInterface = () => {
 
         <ScrollArea className="flex-1 p-4 space-y-4">
           {messages.map((message, index) => renderMessage(message, index))}
+          {isStreaming && streamingContent && (
+            <div className="chat-bubble relative bg-primary/10 border border-primary/20 p-4 rounded-lg max-w-[80%] animate-fade-in">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="outline" className="gap-1">
+                  <Brain className="w-3 h-3" />
+                  {selectedModel.name}
+                </Badge>
+                <div className="animate-pulse">Generating...</div>
+              </div>
+              <ReactMarkdown
+                components={{
+                  h1: ({ children }) => <h1 className="text-2xl font-bold mb-4 mt-6">{children}</h1>,
+                  h2: ({ children }) => <h2 className="text-xl font-bold mb-3 mt-5">{children}</h2>,
+                  h3: ({ children }) => <h3 className="text-lg font-bold mb-2 mt-4">{children}</h3>,
+                  p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>,
+                  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-l-4 border-primary/30 pl-4 italic my-4">
+                      {children}
+                    </blockquote>
+                  ),
+                  code: ({ className, children, ...props }) => {
+                    const match = /language-(\w+)/.exec(className || '');
+                    return match ? (
+                      <div className="relative group">
+                        <button
+                          onClick={() => navigator.clipboard.writeText(String(children))}
+                          className="absolute right-2 top-2 p-1 rounded bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Copy code"
+                        >
+                          <Code className="w-4 h-4" />
+                        </button>
+                        <SyntaxHighlighter
+                          {...props}
+                          style={materialDark}
+                          language={match[1]}
+                          PreTag="div"
+                          className="rounded-lg !mt-2 !mb-4"
+                        >
+                          {String(children).replace(/\n$/, '')}
+                        </SyntaxHighlighter>
+                      </div>
+                    ) : (
+                      <code {...props} className="bg-primary/10 rounded px-1.5 py-0.5">
+                        {children}
+                      </code>
+                    );
+                  }
+                }}
+              >
+                {streamingContent}
+              </ReactMarkdown>
+            </div>
+          )}
         </ScrollArea>
         
         <div className="glass-morphism p-4 border-t">

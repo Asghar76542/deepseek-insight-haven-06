@@ -11,13 +11,20 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const encoder = new TextEncoder();
+  let streamController: ReadableStreamDefaultController;
+  
   try {
     const { prompt } = await req.json();
+    const stream = new ReadableStream({
+      start(controller) {
+        streamController = controller;
+      },
+    });
 
     const response = await fetch(`${geminiApiUrl}?key=${geminiApiKey}`, {
       method: 'POST',
@@ -29,17 +36,41 @@ serve(async (req) => {
           parts: [{
             text: prompt
           }]
-        }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          topP: 1,
+          topK: 40,
+          maxOutputTokens: 2048,
+        },
+        safetySettings: [
+          {
+            category: "HARM_CATEGORY_HARASSMENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          }
+        ]
       }),
     });
 
     const data = await response.json();
-    console.log('Gemini API Response:', data);
+    const text = data.candidates[0].content.parts[0].text;
+    
+    // Split text into chunks and stream
+    const chunks = text.match(/.{1,20}/g) || [];
+    for (const chunk of chunks) {
+      streamController.enqueue(encoder.encode(chunk));
+      await new Promise(resolve => setTimeout(resolve, 50)); // Simulate streaming delay
+    }
+    
+    streamController.close();
 
-    const generatedText = data.candidates[0].content.parts[0].text;
-
-    return new Response(JSON.stringify({ generatedText }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     });
   } catch (error) {
     console.error('Error in chat-with-gemini function:', error);
