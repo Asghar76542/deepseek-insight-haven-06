@@ -13,7 +13,13 @@ import { CitationItem } from './CitationItem';
 import { CitationForm } from './CitationForm';
 import { toast } from "@/hooks/use-toast";
 import { Citation } from '@/types/research';
-import { citationService } from '@/services/citationService';
+import { 
+  fetchCitations,
+  createCitation,
+  updateCitation,
+  deleteCitation,
+  bookmarkCitation 
+} from '@/services/citations/crud';
 
 interface CitationTrackerProps {
   sessionId: string;
@@ -27,9 +33,9 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCitation, setEditingCitation] = useState<Citation | null>(null);
 
-  const fetchCitations = async () => {
+  const loadCitations = async () => {
     try {
-      const data = await citationService.fetchCitations(sessionId);
+      const data = await fetchCitations(sessionId);
       setCitations(data);
     } catch (error) {
       console.error('Error fetching citations:', error);
@@ -42,19 +48,19 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   };
 
   useEffect(() => {
-    fetchCitations();
+    loadCitations();
   }, [sessionId]);
 
   const handleSubmit = async (citationData: Partial<CitationInput>) => {
     try {
       if (editingCitation?.id) {
-        await citationService.updateCitation(editingCitation.id, citationData);
+        await updateCitation(editingCitation.id, citationData);
         toast({
           title: "Success",
           description: "Citation updated successfully",
         });
       } else {
-        await citationService.createCitation({
+        await createCitation({
           ...citationData,
           session_id: sessionId
         });
@@ -66,7 +72,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
       setIsFormOpen(false);
       setEditingCitation(null);
-      fetchCitations();
+      loadCitations();
     } catch (error) {
       console.error('Error saving citation:', error);
       toast({
@@ -79,12 +85,12 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
   const handleDelete = async (id: string) => {
     try {
-      await citationService.deleteCitation(id);
+      await deleteCitation(id);
       toast({
         title: "Success",
         description: "Citation deleted successfully",
       });
-      fetchCitations();
+      loadCitations();
     } catch (error) {
       console.error('Error deleting citation:', error);
       toast({
@@ -97,7 +103,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
 
   const handleBookmark = async (citation: Citation) => {
     try {
-      await citationService.bookmarkCitation(citation.message_id, citation.source_title);
+      await bookmarkCitation(citation.message_id, citation.source_title);
       toast({
         title: "Success",
         description: "Citation bookmarked successfully",
