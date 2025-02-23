@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search, Filter, SortAsc } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,8 +9,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CitationItem } from './CitationItem';
 import { CitationForm } from './CitationForm';
+import { FilterDialog } from './FilterDialog';
 import { toast } from "@/hooks/use-toast";
 import { Citation } from '@/types/research';
 import { 
@@ -27,11 +34,28 @@ interface CitationTrackerProps {
 
 type CitationInput = Omit<Citation, 'id' | 'created_at'>;
 
+type SortField = 'created_at' | 'source_title' | 'citation_text';
+type SortOrder = 'asc' | 'desc';
+
+interface FilterState {
+  dateRange?: { from: Date | null; to: Date | null };
+  sources: string[];
+  hasUrl: boolean | null;
+}
+
 export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
   const [citations, setCitations] = useState<Citation[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [editingCitation, setEditingCitation] = useState<Citation | null>(null);
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [filters, setFilters] = useState<FilterState>({
+    dateRange: { from: null, to: null },
+    sources: [],
+    hasUrl: null
+  });
 
   const loadCitations = async () => {
     try {
@@ -118,10 +142,43 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
     }
   };
 
-  const filteredCitations = citations.filter(citation =>
-    citation.citation_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    citation.source_title?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleSort = (field: SortField) => {
+    setSortField(field);
+    setSortOrder(currentOrder => currentOrder === 'asc' ? 'desc' : 'asc');
+  };
+
+  const handleFilterChange = (newFilters: FilterState) => {
+    setFilters(newFilters);
+  };
+
+  const filteredAndSortedCitations = citations
+    .filter(citation => {
+      // Text search
+      const matchesSearch = !searchTerm || 
+        citation.citation_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        citation.source_title?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Source filter
+      const matchesSource = filters.sources.length === 0 || 
+        (citation.source_title && filters.sources.includes(citation.source_title));
+
+      // URL filter
+      const matchesUrl = filters.hasUrl === null || 
+        (filters.hasUrl ? !!citation.source_url : !citation.source_url);
+
+      // Date range filter
+      const matchesDateRange = !filters.dateRange?.from && !filters.dateRange?.to || 
+        (citation.created_at && 
+          (!filters.dateRange.from || new Date(citation.created_at) >= filters.dateRange.from) &&
+          (!filters.dateRange.to || new Date(citation.created_at) <= filters.dateRange.to));
+
+      return matchesSearch && matchesSource && matchesUrl && matchesDateRange;
+    })
+    .sort((a, b) => {
+      if (!a[sortField] || !b[sortField]) return 0;
+      const comparison = String(a[sortField]).localeCompare(String(b[sortField]));
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
 
   return (
     <div className="space-y-4">
@@ -136,9 +193,31 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
               className="w-64 pl-9"
             />
           </div>
-          <Button variant="outline" size="icon">
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={() => setIsFilterOpen(true)}
+          >
             <Filter className="w-4 h-4" />
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <SortAsc className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => handleSort('created_at')}>
+                Sort by Date {sortField === 'created_at' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSort('source_title')}>
+                Sort by Source {sortField === 'source_title' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSort('citation_text')}>
+                Sort by Text {sortField === 'citation_text' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <Button onClick={() => {
           setEditingCitation(null);
@@ -150,7 +229,7 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
       </div>
 
       <div className="grid gap-4">
-        {filteredCitations.map((citation) => (
+        {filteredAndSortedCitations.map((citation) => (
           <CitationItem
             key={citation.id}
             citation={citation}
@@ -181,6 +260,15 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
           />
         </DialogContent>
       </Dialog>
+
+      <FilterDialog
+        open={isFilterOpen}
+        onOpenChange={setIsFilterOpen}
+        filters={filters}
+        onApplyFilters={handleFilterChange}
+        availableSources={Array.from(new Set(citations.map(c => c.source_title).filter(Boolean) as string[]))}
+      />
     </div>
   );
 };
+
