@@ -18,13 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { addDays } from 'date-fns';
 
 interface FilterDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   filters: {
-    dateRange: { from: Date | null; to: Date | null };
+    dateRange?: { from: Date | null; to: Date | null };
     sources: string[];
     hasUrl: boolean | null;
   };
@@ -70,8 +69,8 @@ export function FilterDialog({
               <Calendar
                 mode="range"
                 selected={{
-                  from: currentFilters.dateRange.from || undefined,
-                  to: currentFilters.dateRange.to || undefined,
+                  from: currentFilters.dateRange?.from || undefined,
+                  to: currentFilters.dateRange?.to || undefined,
                 }}
                 onSelect={(range) => 
                   setCurrentFilters(prev => ({

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, SortAsc } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -271,4 +270,3 @@ export const CitationTracker = ({ sessionId }: CitationTrackerProps) => {
     </div>
   );
 };
-
