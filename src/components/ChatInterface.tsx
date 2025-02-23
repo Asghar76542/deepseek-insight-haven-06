@@ -467,40 +467,19 @@ const ChatInterface = () => {
             {message.metadata?.model}
           </Badge>
           {message.metadata?.tokenMetrics && (
-            <Badge variant="outline" className="gap-1">
-              <MonitorSmartphone className="w-3 h-3" />
-              {message.metadata.tokenMetrics.inputTokens + message.metadata.tokenMetrics.outputTokens} tokens
-            </Badge>
-            <Badge variant="outline" className="gap-1">
-              <BarChart3 className="w-3 h-3" />
-              ${message.metadata.tokenMetrics.totalCost.toFixed(4)}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="gap-1">
+                <MonitorSmartphone className="w-3 h-3" />
+                {message.metadata.tokenMetrics.inputTokens + message.metadata.tokenMetrics.outputTokens} tokens
+              </Badge>
+              <Badge variant="outline" className="gap-1">
+                <BarChart3 className="w-3 h-3" />
+                ${message.metadata.tokenMetrics.totalCost.toFixed(4)}
+              </Badge>
+            </div>
           )}
         </div>
       )}
-
-      <div className="absolute top-2 right-2 flex gap-2">
-        {message.id && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => handleMessageAction(message.id, 'pin')}
-            >
-              <Pin className={`w-4 h-4 ${message.metadata?.isPinned ? 'text-primary' : ''}`} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => handleMessageAction(message.id, 'edit')}
-            >
-              <Edit className="w-4 h-4" />
-            </Button>
-          </>
-        )}
-      </div>
 
       {editingMessageId === message.id ? (
         <div className="space-y-2">
