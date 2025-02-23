@@ -170,9 +170,11 @@ const ChatInterface = () => {
     }
   };
 
-  const saveMessage = async (conversationId: string, message: Message) => {
+  const saveMessage = async (conversationId: string, message: Message): Promise<string | undefined> => {
     try {
+      const messageId = uuidv4();
       const messageData = {
+        id: messageId,
         conversation_id: conversationId,
         role: message.role,
         content: message.content,
@@ -180,11 +182,15 @@ const ChatInterface = () => {
         metadata: message.metadata as Json
       };
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
-        .insert(messageData);
+        .insert(messageData)
+        .select()
+        .single();
 
       if (error) throw error;
+      
+      return messageId;
     } catch (error) {
       console.error('Error saving message:', error);
       toast({
@@ -192,6 +198,7 @@ const ChatInterface = () => {
         description: "Message saved locally but failed to sync",
         variant: "default",
       });
+      return undefined;
     }
   };
 
@@ -203,6 +210,42 @@ const ChatInterface = () => {
       outputTokens: 0,
       totalCost: cost
     };
+  };
+
+  const handleSelectSession = async (session: ResearchSession) => {
+    try {
+      const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('session_id', session.id)
+        .single();
+
+      if (convError) throw convError;
+
+      const { data: messageData, error: messagesError } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversation.id)
+        .order('created_at');
+
+      if (messagesError) throw messagesError;
+
+      setCurrentSession(session);
+      const typedMessages: Message[] = (messageData || []).map(msg => ({
+        id: msg.id,
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        metadata: msg.metadata as MessageMetadata
+      }));
+      setMessages(typedMessages);
+    } catch (error) {
+      console.error('Error loading session:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load research session",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSend = async () => {
@@ -226,23 +269,26 @@ const ChatInterface = () => {
         }
       };
 
-      setMessages(prev => [...prev, userMessage]);
-      setInput('');
-      setStreamingContent('');
-
       const { data: conversation } = await supabase
         .from('conversations')
         .select()
         .eq('session_id', currentSession?.id)
         .single();
 
-      await saveMessage(conversation.id, userMessage);
+      const messageId = await saveMessage(conversation.id, userMessage);
+      userMessage.id = messageId;
 
-      const response = await fetch('/api/chat-with-gemini', {
+      setMessages(prev => [...prev, userMessage]);
+      setInput('');
+      setStreamingContent('');
+
+      const { data: response, error: responseError } = await fetch('/api/chat-with-gemini', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: input }),
       });
+
+      if (responseError) throw responseError;
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -284,7 +330,9 @@ const ChatInterface = () => {
         }
       };
 
-      await saveMessage(conversation.id, assistantMessage);
+      const assistantMessageId = await saveMessage(conversation.id, assistantMessage);
+      assistantMessage.id = assistantMessageId;
+
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
@@ -326,42 +374,6 @@ const ChatInterface = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleSelectSession = async (session: ResearchSession) => {
-    try {
-      const { data: conversation, error: convError } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('session_id', session.id)
-        .single();
-
-      if (convError) throw convError;
-
-      const { data: messageData, error: messagesError } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversation.id)
-        .order('created_at');
-
-      if (messagesError) throw messagesError;
-
-      setCurrentSession(session);
-      const typedMessages: Message[] = (messageData || []).map(msg => ({
-        id: msg.id,
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-        metadata: msg.metadata as MessageMetadata
-      }));
-      setMessages(typedMessages);
-    } catch (error) {
-      console.error('Error loading session:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load research session",
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleScreenshotAnalysis = (analysis: string) => {
     const assistantMessage = {
       role: 'assistant' as const,
@@ -386,11 +398,25 @@ const ChatInterface = () => {
   };
 
   const handleMessageAction = async (messageId: string | undefined, action: 'pin' | 'edit' | 'save') => {
-    if (!messageId) return;
+    if (!messageId) {
+      toast({
+        title: "Error",
+        description: "Message ID is missing",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const messageIndex = messages.findIndex(m => m.id === messageId);
-      if (messageIndex === -1) return;
+      if (messageIndex === -1) {
+        toast({
+          title: "Error",
+          description: "Message not found",
+          variant: "destructive",
+        });
+        return;
+      }
 
       const message = messages[messageIndex];
 
@@ -401,6 +427,15 @@ const ChatInterface = () => {
             isPinned: !message.metadata?.isPinned
           };
           
+          const { error: pinError } = await supabase
+            .from('messages')
+            .update({
+              metadata: updatedMetadata as Json
+            })
+            .eq('id', messageId);
+
+          if (pinError) throw pinError;
+          
           const updatedMessage = {
             ...message,
             metadata: updatedMetadata
@@ -410,23 +445,6 @@ const ChatInterface = () => {
           newMessages[messageIndex] = updatedMessage;
           setMessages(newMessages);
           
-          if (currentSession) {
-            const { data: conversation } = await supabase
-              .from('conversations')
-              .select()
-              .eq('session_id', currentSession.id)
-              .single();
-
-            if (conversation) {
-              await supabase
-                .from('messages')
-                .update({
-                  metadata: updatedMetadata as Json
-                })
-                .eq('id', messageId);
-            }
-          }
-          
           toast({
             title: updatedMessage.metadata?.isPinned ? "Message pinned" : "Message unpinned",
             description: "The message has been updated",
@@ -434,6 +452,7 @@ const ChatInterface = () => {
           break;
 
         case 'edit':
+          if (!message) return;
           setEditingMessageId(messageId);
           setEditContent(message.content);
           break;
@@ -447,6 +466,16 @@ const ChatInterface = () => {
             editedAt: new Date().toISOString()
           };
 
+          const { error: saveError } = await supabase
+            .from('messages')
+            .update({
+              content: editContent,
+              metadata: editedMetadata as Json
+            })
+            .eq('id', messageId);
+
+          if (saveError) throw saveError;
+
           const editedMessage = {
             ...message,
             content: editContent,
@@ -458,24 +487,6 @@ const ChatInterface = () => {
           setMessages(updatedMessages);
           setEditingMessageId(null);
           setEditContent('');
-
-          if (currentSession) {
-            const { data: conversation } = await supabase
-              .from('conversations')
-              .select()
-              .eq('session_id', currentSession.id)
-              .single();
-
-            if (conversation) {
-              await supabase
-                .from('messages')
-                .update({
-                  content: editContent,
-                  metadata: editedMetadata as Json
-                })
-                .eq('id', messageId);
-            }
-          }
 
           toast({
             title: "Message updated",
