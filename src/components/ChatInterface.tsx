@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Settings, ChevronDown, Send, Save, Download, Pin, Edit, Star, Brain, MonitorSmartphone, BarChart3, Code, Quote, List } from 'lucide-react';
 import {
@@ -282,13 +283,15 @@ const ChatInterface = () => {
       setInput('');
       setStreamingContent('');
 
-      const { data: response, error: responseError } = await fetch('/api/chat-with-gemini', {
+      const response = await fetch('/api/chat-with-gemini', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: input }),
       });
 
-      if (responseError) throw responseError;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
