@@ -4,29 +4,44 @@ import { BookOpen, ChevronDown, Zap, Book, Link2, Brain } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 
 const ResearchCard = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon: any }) => (
-  <div className="glass-card">
+  <div className="glass-card group animate-fade-in">
     <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center gap-2">
-        <Icon className="w-4 h-4 text-primary" />
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-md bg-primary/10">
+          <Icon className="w-5 h-5 text-primary" />
+        </div>
         <h3 className="text-lg font-semibold">{title}</h3>
       </div>
-      <ChevronDown className="w-5 h-5 text-muted-foreground" />
+      <ChevronDown className="w-5 h-5 text-muted-foreground transition-transform duration-200 group-hover:rotate-180" />
     </div>
-    {children}
+    <div className="research-card-content">
+      {children}
+    </div>
   </div>
 );
 
 const ModelMetrics = () => (
-  <div className="grid grid-cols-3 gap-4 mb-4">
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
     {[
-      { label: 'Confidence', value: 92 },
-      { label: 'Coherence', value: 88 },
-      { label: 'Citation Quality', value: 95 },
-    ].map((metric) => (
-      <div key={metric.label} className="glass-morphism p-4 rounded-lg">
+      { label: 'Confidence', value: 92, color: 'rgb(147, 51, 234)' },
+      { label: 'Coherence', value: 88, color: 'rgb(59, 130, 246)' },
+      { label: 'Citation Quality', value: 95, color: 'rgb(16, 185, 129)' },
+    ].map((metric, index) => (
+      <div 
+        key={metric.label} 
+        className="metric-card animate-fade-in"
+        style={{ animationDelay: `${index * 100}ms` }}
+      >
         <div className="text-sm text-muted-foreground mb-2">{metric.label}</div>
-        <Progress value={metric.value} className="h-2" />
-        <div className="text-right text-sm mt-1">{metric.value}%</div>
+        <Progress 
+          value={metric.value} 
+          className="h-2 mb-1"
+          indicatorClassName="transition-all duration-500"
+          style={{ 
+            '--progress-background': metric.color 
+          } as React.CSSProperties}
+        />
+        <div className="text-right text-sm font-medium mt-1">{metric.value}%</div>
       </div>
     ))}
   </div>
@@ -35,8 +50,10 @@ const ModelMetrics = () => (
 const ResearchDashboard = () => {
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
-      <div className="flex items-center gap-3 mb-6">
-        <BookOpen className="w-6 h-6 text-primary" />
+      <div className="flex items-center gap-3 mb-6 animate-fade-in">
+        <div className="p-2 rounded-md bg-primary/10">
+          <BookOpen className="w-6 h-6 text-primary" />
+        </div>
         <h2 className="text-2xl font-semibold">Research Insights</h2>
       </div>
 
@@ -69,19 +86,21 @@ const ResearchDashboard = () => {
             <p className="text-muted-foreground">
               Each model contributes its unique strengths:
             </p>
-            <div className="space-y-2">
-              <div className="text-sm">
-                <span className="text-primary">GPT-4</span>
-                <span className="text-muted-foreground"> - Broad knowledge synthesis</span>
-              </div>
-              <div className="text-sm">
-                <span className="text-primary">Claude</span>
-                <span className="text-muted-foreground"> - Detailed analysis</span>
-              </div>
-              <div className="text-sm">
-                <span className="text-primary">DeepSeek</span>
-                <span className="text-muted-foreground"> - Technical expertise</span>
-              </div>
+            <div className="space-y-3">
+              {[
+                { name: 'GPT-4', desc: 'Broad knowledge synthesis' },
+                { name: 'Claude', desc: 'Detailed analysis' },
+                { name: 'DeepSeek', desc: 'Technical expertise' }
+              ].map((model, index) => (
+                <div 
+                  key={model.name} 
+                  className="flex items-center gap-2 text-sm animate-fade-in"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <span className="text-primary font-medium">{model.name}</span>
+                  <span className="text-muted-foreground">- {model.desc}</span>
+                </div>
+              ))}
             </div>
           </div>
         </ResearchCard>
