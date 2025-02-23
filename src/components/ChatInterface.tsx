@@ -21,11 +21,30 @@ import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Json } from '@/integrations/supabase/types';
 
 interface TokenMetrics {
   inputTokens: number;
   outputTokens: number;
   totalCost: number;
+}
+
+type JsonTokenMetrics = {
+  inputTokens: number;
+  outputTokens: number;
+  totalCost: number;
+}
+
+interface MessageMetadata {
+  isPinned?: boolean;
+  isEdited?: boolean;
+  editedAt?: string;
+  model?: string;
+  timestamp?: string;
+  tokenMetrics?: JsonTokenMetrics;
+  sentiment?: number;
+  complexity?: number;
+  [key: string]: Json | undefined;
 }
 
 interface ModelOption {
@@ -35,6 +54,13 @@ interface ModelOption {
   capabilities: string[];
   costPer1kTokens: number;
   maxTokens: number;
+}
+
+interface Message {
+  id?: string;
+  role: 'user' | 'assistant';
+  content: string;
+  metadata?: MessageMetadata;
 }
 
 const modelOptions: ModelOption[] = [
@@ -71,23 +97,6 @@ const modelOptions: ModelOption[] = [
     maxTokens: 32768
   },
 ];
-
-interface Message {
-  id?: string;
-  role: 'user' | 'assistant';
-  content: string;
-  metadata?: {
-    isPinned?: boolean;
-    isEdited?: boolean;
-    editedAt?: string;
-    model?: string;
-    timestamp?: string;
-    tokenMetrics?: TokenMetrics;
-    sentiment?: number;
-    complexity?: number;
-    [key: string]: any;
-  };
-}
 
 const ChatInterface = () => {
   const [selectedModel, setSelectedModel] = useState(modelOptions[3]);
@@ -166,7 +175,7 @@ const ChatInterface = () => {
         role: message.role,
         content: message.content,
         model_name: selectedModel.name,
-        metadata: message.metadata || {}
+        metadata: message.metadata as Json
       };
 
       const { error } = await supabase
@@ -358,12 +367,14 @@ const ChatInterface = () => {
 
       switch (action) {
         case 'pin':
+          const updatedMetadata: MessageMetadata = {
+            ...message.metadata,
+            isPinned: !message.metadata?.isPinned
+          };
+          
           const updatedMessage = {
             ...message,
-            metadata: {
-              ...message.metadata,
-              isPinned: !message.metadata?.isPinned
-            }
+            metadata: updatedMetadata
           };
           
           const newMessages = [...messages];
@@ -381,7 +392,7 @@ const ChatInterface = () => {
               await supabase
                 .from('messages')
                 .update({
-                  metadata: updatedMessage.metadata
+                  metadata: updatedMetadata as Json
                 })
                 .eq('id', messageId);
             }
@@ -401,14 +412,16 @@ const ChatInterface = () => {
         case 'save':
           if (!editContent.trim()) return;
 
+          const editedMetadata: MessageMetadata = {
+            ...message.metadata,
+            isEdited: true,
+            editedAt: new Date().toISOString()
+          };
+
           const editedMessage = {
             ...message,
             content: editContent,
-            metadata: {
-              ...message.metadata,
-              isEdited: true,
-              editedAt: new Date().toISOString()
-            }
+            metadata: editedMetadata
           };
 
           const updatedMessages = [...messages];
@@ -429,7 +442,7 @@ const ChatInterface = () => {
                 .from('messages')
                 .update({
                   content: editContent,
-                  metadata: editedMessage.metadata
+                  metadata: editedMetadata as Json
                 })
                 .eq('id', messageId);
             }
