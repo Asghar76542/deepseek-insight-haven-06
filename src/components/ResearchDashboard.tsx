@@ -2,6 +2,7 @@
 import React from 'react';
 import { BookOpen, ChevronDown, Zap, Book, Link2, Brain } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 
 const ResearchCard = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon: any }) => (
   <div className="glass-card group animate-fade-in">
@@ -35,10 +36,12 @@ const ModelMetrics = () => (
         <div className="text-sm text-muted-foreground mb-2">{metric.label}</div>
         <Progress 
           value={metric.value} 
-          className="h-2 mb-1"
-          indicatorClassName="transition-all duration-500"
+          className={cn(
+            "h-2 mb-1",
+            "transition-all duration-500"
+          )}
           style={{ 
-            '--progress-background': metric.color 
+            '--tw-gradient-from': metric.color,
           } as React.CSSProperties}
         />
         <div className="text-right text-sm font-medium mt-1">{metric.value}%</div>
