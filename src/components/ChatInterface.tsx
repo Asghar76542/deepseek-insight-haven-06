@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Settings, ChevronDown, Send, Save, Download, Pin, Edit, Star, Brain, MonitorSmartphone, BarChart3 } from 'lucide-react';
 import {
@@ -215,7 +216,11 @@ const ChatInterface = () => {
         content: input,
         metadata: {
           timestamp: new Date().toISOString(),
-          tokenMetrics: inputMetrics
+          tokenMetrics: {
+            inputTokens: inputMetrics.inputTokens,
+            outputTokens: inputMetrics.outputTokens,
+            totalCost: inputMetrics.totalCost
+          }
         }
       };
 
@@ -251,7 +256,11 @@ const ChatInterface = () => {
         metadata: {
           model: selectedModel.name,
           timestamp: new Date().toISOString(),
-          tokenMetrics: outputMetrics,
+          tokenMetrics: {
+            inputTokens: outputMetrics.inputTokens,
+            outputTokens: outputMetrics.outputTokens,
+            totalCost: outputMetrics.totalCost
+          },
           sentiment: Math.random() * 100,
           complexity: Math.random() * 100
         }
