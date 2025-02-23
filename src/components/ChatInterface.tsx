@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Settings, ChevronDown, Send, Save, Download, Pin, Edit, Star } from 'lucide-react';
+import { MessageSquare, Settings, ChevronDown, Send, Save, Download, Pin, Edit, Star, Brain, MonitorSmartphone, BarChart3 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,29 +17,77 @@ import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { SessionManager } from '@/components/SessionManager';
 import { ScreenshotCapture } from '@/components/ScreenshotCapture';
 import { ResearchSession } from '@/types/research';
+import { Progress } from "@/components/ui/progress";
+import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 
-interface MessageMetadata {
-  isPinned?: boolean;
-  isEdited?: boolean;
-  editedAt?: string;
-  model?: string;
-  timestamp?: string;
-  [key: string]: string | boolean | undefined;
+interface TokenMetrics {
+  inputTokens: number;
+  outputTokens: number;
+  totalCost: number;
 }
+
+interface ModelOption {
+  name: string;
+  provider: string;
+  description: string;
+  capabilities: string[];
+  costPer1kTokens: number;
+  maxTokens: number;
+}
+
+const modelOptions: ModelOption[] = [
+  {
+    name: 'GPT-4',
+    provider: 'OpenAI',
+    description: 'Latest GPT-4 model with enhanced capabilities',
+    capabilities: ['Text Generation', 'Code Analysis', 'Complex Reasoning'],
+    costPer1kTokens: 0.03,
+    maxTokens: 8192
+  },
+  {
+    name: 'Claude 3 Opus',
+    provider: 'Anthropic',
+    description: 'Most capable Claude model',
+    capabilities: ['Long Context', 'Technical Analysis', 'Research'],
+    costPer1kTokens: 0.02,
+    maxTokens: 100000
+  },
+  {
+    name: 'DeepSeek-MoE',
+    provider: 'DeepSeek',
+    description: 'Mixture of Experts architecture',
+    capabilities: ['Code Generation', 'Technical Writing', 'Problem Solving'],
+    costPer1kTokens: 0.01,
+    maxTokens: 16384
+  },
+  {
+    name: 'Gemini Ultra',
+    provider: 'Google',
+    description: 'Most capable Gemini model',
+    capabilities: ['Multimodal', 'Complex Tasks', 'Creative Writing'],
+    costPer1kTokens: 0.025,
+    maxTokens: 32768
+  },
+];
 
 interface Message {
   id?: string;
   role: 'user' | 'assistant';
   content: string;
-  metadata?: MessageMetadata;
+  metadata?: {
+    isPinned?: boolean;
+    isEdited?: boolean;
+    editedAt?: string;
+    model?: string;
+    timestamp?: string;
+    tokenMetrics?: TokenMetrics;
+    sentiment?: number;
+    complexity?: number;
+    [key: string]: any;
+  };
 }
-
-const modelOptions = [
-  { name: 'GPT-4', provider: 'OpenAI', description: 'Latest GPT-4 model with enhanced capabilities' },
-  { name: 'Claude 3 Opus', provider: 'Anthropic', description: 'Most capable Claude model' },
-  { name: 'DeepSeek-MoE', provider: 'DeepSeek', description: 'Mixture of Experts architecture' },
-  { name: 'Gemini Ultra', provider: 'Google', description: 'Most capable Gemini model' },
-];
 
 const ChatInterface = () => {
   const [selectedModel, setSelectedModel] = useState(modelOptions[3]);
@@ -48,6 +97,11 @@ const ChatInterface = () => {
   const [currentSession, setCurrentSession] = useState<ResearchSession | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [totalTokens, setTotalTokens] = useState<TokenMetrics>({
+    inputTokens: 0,
+    outputTokens: 0,
+    totalCost: 0
+  });
 
   useEffect(() => {
     initializeSession();
@@ -130,12 +184,32 @@ const ChatInterface = () => {
     }
   };
 
+  const calculateTokenMetrics = (text: string): TokenMetrics => {
+    const estimatedTokens = Math.ceil(text.length / 4);
+    const cost = (estimatedTokens / 1000) * selectedModel.costPer1kTokens;
+    return {
+      inputTokens: estimatedTokens,
+      outputTokens: 0,
+      totalCost: cost
+    };
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
     try {
       setIsLoading(true);
-      const userMessage = { role: 'user' as const, content: input };
+      const inputMetrics = calculateTokenMetrics(input);
+      
+      const userMessage: Message = {
+        role: 'user',
+        content: input,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          tokenMetrics: inputMetrics
+        }
+      };
+
       setMessages(prev => [...prev, userMessage]);
       setInput('');
 
@@ -153,21 +227,31 @@ const ChatInterface = () => {
 
       if (error) throw error;
 
-      const assistantMessage = { 
-        role: 'assistant' as const, 
+      const outputMetrics = calculateTokenMetrics(data.generatedText);
+      const newTotalMetrics = {
+        inputTokens: totalTokens.inputTokens + inputMetrics.inputTokens,
+        outputTokens: totalTokens.outputTokens + outputMetrics.inputTokens,
+        totalCost: totalTokens.totalCost + inputMetrics.totalCost + outputMetrics.totalCost
+      };
+
+      setTotalTokens(newTotalMetrics);
+
+      const assistantMessage: Message = {
+        role: 'assistant',
         content: data.generatedText,
-        metadata: { model: selectedModel.name, timestamp: new Date().toISOString() }
+        metadata: {
+          model: selectedModel.name,
+          timestamp: new Date().toISOString(),
+          tokenMetrics: outputMetrics,
+          sentiment: Math.random() * 100,
+          complexity: Math.random() * 100
+        }
       };
 
       await saveMessage(conversation.id, assistantMessage);
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
-      const errorMessage = {
-        role: 'assistant' as const,
-        content: 'I apologize, but I encountered an error processing your request. Please try again.',
-      };
-      setMessages(prev => [...prev, errorMessage]);
       toast({
         title: "Error",
         description: "Failed to process message",
@@ -286,7 +370,6 @@ const ChatInterface = () => {
           newMessages[messageIndex] = updatedMessage;
           setMessages(newMessages);
           
-          // Update in database
           if (currentSession) {
             const { data: conversation } = await supabase
               .from('conversations')
@@ -334,7 +417,6 @@ const ChatInterface = () => {
           setEditingMessageId(null);
           setEditContent('');
 
-          // Update in database
           if (currentSession) {
             const { data: conversation } = await supabase
               .from('conversations')
@@ -369,9 +451,121 @@ const ChatInterface = () => {
     }
   };
 
+  const renderMessage = (message: Message, index: number) => (
+    <div
+      key={index}
+      className={`chat-bubble relative ${
+        message.role === 'assistant' 
+          ? 'bg-primary/10 border border-primary/20' 
+          : 'ml-auto bg-secondary/20'
+      } p-4 rounded-lg max-w-[80%] ${message.metadata?.isPinned ? 'border-l-4 border-primary' : ''}`}
+    >
+      {message.role === 'assistant' && (
+        <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+          <Badge variant="outline" className="gap-1">
+            <Brain className="w-3 h-3" />
+            {message.metadata?.model}
+          </Badge>
+          {message.metadata?.tokenMetrics && (
+            <Badge variant="outline" className="gap-1">
+              <MonitorSmartphone className="w-3 h-3" />
+              {message.metadata.tokenMetrics.inputTokens + message.metadata.tokenMetrics.outputTokens} tokens
+            </Badge>
+            <Badge variant="outline" className="gap-1">
+              <BarChart3 className="w-3 h-3" />
+              ${message.metadata.tokenMetrics.totalCost.toFixed(4)}
+            </Badge>
+          )}
+        </div>
+      )}
+
+      <div className="absolute top-2 right-2 flex gap-2">
+        {message.id && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => handleMessageAction(message.id, 'pin')}
+            >
+              <Pin className={`w-4 h-4 ${message.metadata?.isPinned ? 'text-primary' : ''}`} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => handleMessageAction(message.id, 'edit')}
+            >
+              <Edit className="w-4 h-4" />
+            </Button>
+          </>
+        )}
+      </div>
+
+      {editingMessageId === message.id ? (
+        <div className="space-y-2">
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            className="w-full min-h-[100px] p-2 rounded bg-background/50 border focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditingMessageId(null);
+                setEditContent('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => handleMessageAction(message.id, 'save')}
+            >
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <ReactMarkdown
+            components={{
+              code({className, children, ...props}) {
+                const match = /language-(\w+)/.exec(className || '');
+                return match ? (
+                  <SyntaxHighlighter
+                    {...props}
+                    style={materialDark}
+                    language={match[1]}
+                    PreTag="div"
+                  >
+                    {String(children).replace(/\n$/, '')}
+                  </SyntaxHighlighter>
+                ) : (
+                  <code {...props} className={className}>
+                    {children}
+                  </code>
+                );
+              }
+            }}
+          >
+            {message.content}
+          </ReactMarkdown>
+          {message.metadata?.isEdited && (
+            <div className="text-xs text-muted-foreground mt-2">
+              Edited {new Date(message.metadata.editedAt!).toLocaleDateString()}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex h-screen">
-      {/* Left sidebar */}
       <div className="w-80 border-r border-border bg-background overflow-y-auto p-4">
         <SessionManager
           onSelectSession={handleSelectSession}
@@ -379,7 +573,6 @@ const ChatInterface = () => {
         />
       </div>
       
-      {/* Main chat area */}
       <div className="flex-1 flex flex-col">
         <div className="glass-morphism p-4 border-b">
           <div className="flex items-center justify-between">
@@ -416,110 +609,41 @@ const ChatInterface = () => {
                     >
                       <div className="flex items-center justify-between w-full">
                         <span className="font-medium">{model.name}</span>
-                        <span className="text-xs text-muted-foreground">{model.provider}</span>
+                        <Badge variant="secondary">{model.provider}</Badge>
                       </div>
                       <span className="text-xs text-muted-foreground">{model.description}</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {model.capabilities.map((capability) => (
+                          <Badge key={capability} variant="outline" className="text-xs">
+                            {capability}
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        ${model.costPer1kTokens}/1k tokens • Max {model.maxTokens} tokens
+                      </div>
                     </DropdownMenuItem>
                   ))}
+                  <DropdownMenuSeparator />
+                  <div className="p-2 text-xs text-muted-foreground">
+                    <div className="flex justify-between mb-1">
+                      <span>Total Tokens Used:</span>
+                      <span>{totalTokens.inputTokens + totalTokens.outputTokens}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total Cost:</span>
+                      <span>${totalTokens.totalCost.toFixed(4)}</span>
+                    </div>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`chat-bubble relative ${
-                message.role === 'assistant' ? 'bg-primary/20' : 'ml-auto bg-secondary/20'
-              } p-4 rounded-lg max-w-[80%] ${message.metadata?.isPinned ? 'border-l-4 border-primary' : ''}`}
-            >
-              <div className="absolute top-2 right-2 flex gap-2">
-                {message.id && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleMessageAction(message.id, 'pin')}
-                    >
-                      <Pin className={`w-4 h-4 ${message.metadata?.isPinned ? 'text-primary' : ''}`} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleMessageAction(message.id, 'edit')}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                  </>
-                )}
-              </div>
-              
-              {editingMessageId === message.id ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full min-h-[100px] p-2 rounded bg-background/50 border focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditingMessageId(null);
-                        setEditContent('');
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleMessageAction(message.id, 'save')}
-                    >
-                      Save Changes
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <ReactMarkdown
-                    components={{
-                      code({className, children, ...props}) {
-                        const match = /language-(\w+)/.exec(className || '');
-                        return match ? (
-                          <SyntaxHighlighter
-                            {...props}
-                            style={materialDark}
-                            language={match[1]}
-                            PreTag="div"
-                          >
-                            {String(children).replace(/\n$/, '')}
-                          </SyntaxHighlighter>
-                        ) : (
-                          <code {...props} className={className}>
-                            {children}
-                          </code>
-                        );
-                      }
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
-                  {message.metadata?.isEdited && (
-                    <div className="text-xs text-muted-foreground mt-2">
-                      Edited {new Date(message.metadata.editedAt!).toLocaleDateString()}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
-        </div>
+
+        <ScrollArea className="flex-1 p-4 space-y-4">
+          {messages.map((message, index) => renderMessage(message, index))}
+        </ScrollArea>
         
         <div className="glass-morphism p-4 border-t">
           <div className="flex flex-col gap-4">
@@ -533,16 +657,25 @@ const ChatInterface = () => {
                 <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                 <span>Provider: {selectedModel.provider}</span>
               </div>
+              <span>•</span>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                <span>Cost: ${selectedModel.costPer1kTokens}/1k tokens</span>
+              </div>
             </div>
             
             <div className="flex gap-2">
-              <input
-                type="text"
+              <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
                 placeholder="Type your research query..."
-                className="flex-1 bg-background/50 rounded-lg px-4 py-2 border focus:outline-none focus:ring-2 focus:ring-primary/50"
+                className="flex-1 bg-background/50 rounded-lg px-4 py-2 border focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[80px] resize-none"
                 disabled={isLoading}
               />
               <Button 
