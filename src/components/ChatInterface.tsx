@@ -1,68 +1,16 @@
-
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Settings, ChevronDown, Send, Save, Download, Pin, Edit, Star, Brain, MonitorSmartphone, BarChart3, Code, Quote, List } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { MessageSquare, Download } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { v4 as uuidv4 } from 'uuid';
 import { toast } from "@/hooks/use-toast";
-import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { SessionManager } from '@/components/SessionManager';
 import { ScreenshotCapture } from '@/components/ScreenshotCapture';
 import { ResearchSession } from '@/types/research';
-import { Progress } from "@/components/ui/progress";
-import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { Json } from '@/integrations/supabase/types';
-
-interface TokenMetrics {
-  inputTokens: number;
-  outputTokens: number;
-  totalCost: number;
-}
-
-type JsonTokenMetrics = {
-  inputTokens: number;
-  outputTokens: number;
-  totalCost: number;
-}
-
-interface MessageMetadata {
-  isPinned?: boolean;
-  isEdited?: boolean;
-  editedAt?: string;
-  model?: string;
-  timestamp?: string;
-  tokenMetrics?: JsonTokenMetrics;
-  sentiment?: number;
-  complexity?: number;
-  [key: string]: Json | undefined;
-}
-
-interface ModelOption {
-  name: string;
-  provider: string;
-  description: string;
-  capabilities: string[];
-  costPer1kTokens: number;
-  maxTokens: number;
-}
-
-interface Message {
-  id?: string;
-  role: 'user' | 'assistant';
-  content: string;
-  metadata?: MessageMetadata;
-}
+import { supabase } from "@/integrations/supabase/client";
+import { ModelSelector } from './chat/ModelSelector';
+import { ChatMessage } from './chat/ChatMessage';
+import { Message, ModelOption, TokenMetrics } from '@/types/chat';
+import { saveMessage, calculateTokenMetrics, updateMessage } from '@/services/chat/chatService';
 
 const modelOptions: ModelOption[] = [
   {
@@ -171,48 +119,6 @@ const ChatInterface = () => {
     }
   };
 
-  const saveMessage = async (conversationId: string, message: Message): Promise<string | undefined> => {
-    try {
-      const messageId = uuidv4();
-      const messageData = {
-        id: messageId,
-        conversation_id: conversationId,
-        role: message.role,
-        content: message.content,
-        model_name: selectedModel.name,
-        metadata: message.metadata as Json
-      };
-
-      const { data, error } = await supabase
-        .from('messages')
-        .insert(messageData)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      return messageId;
-    } catch (error) {
-      console.error('Error saving message:', error);
-      toast({
-        title: "Warning",
-        description: "Message saved locally but failed to sync",
-        variant: "default",
-      });
-      return undefined;
-    }
-  };
-
-  const calculateTokenMetrics = (text: string): TokenMetrics => {
-    const estimatedTokens = Math.ceil(text.length / 4);
-    const cost = (estimatedTokens / 1000) * selectedModel.costPer1kTokens;
-    return {
-      inputTokens: estimatedTokens,
-      outputTokens: 0,
-      totalCost: cost
-    };
-  };
-
   const handleSelectSession = async (session: ResearchSession) => {
     try {
       const { data: conversation, error: convError } = await supabase
@@ -236,7 +142,7 @@ const ChatInterface = () => {
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
         content: msg.content,
-        metadata: msg.metadata as MessageMetadata
+        metadata: msg.metadata as Message['metadata']
       }));
       setMessages(typedMessages);
     } catch (error) {
@@ -255,6 +161,7 @@ const ChatInterface = () => {
     try {
       setIsLoading(true);
       setIsStreaming(true);
+
       const inputMetrics = calculateTokenMetrics(input);
       
       const userMessage: Message = {
@@ -351,55 +258,6 @@ const ChatInterface = () => {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  const exportConversation = () => {
-    const exportData = {
-      session: currentSession,
-      model: selectedModel,
-      messages: messages,
-      exportedAt: new Date().toISOString(),
-    };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `research-session-${currentSession?.id}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleScreenshotAnalysis = (analysis: string) => {
-    const assistantMessage = {
-      role: 'assistant' as const,
-      content: `📸 Screenshot Analysis:\n\n${analysis}`,
-      metadata: { type: 'screenshot_analysis', timestamp: new Date().toISOString() }
-    };
-    
-    setMessages(prev => [...prev, assistantMessage]);
-    
-    if (currentSession) {
-      supabase
-        .from('conversations')
-        .select()
-        .eq('session_id', currentSession.id)
-        .single()
-        .then(({ data: conversation }) => {
-          if (conversation) {
-            saveMessage(conversation.id, assistantMessage);
-          }
-        });
-    }
-  };
-
   const handleMessageAction = async (messageId: string | undefined, action: 'pin' | 'edit' | 'save') => {
     if (!messageId) {
       toast({
@@ -412,50 +270,28 @@ const ChatInterface = () => {
 
     try {
       const messageIndex = messages.findIndex(m => m.id === messageId);
-      if (messageIndex === -1) {
-        toast({
-          title: "Error",
-          description: "Message not found",
-          variant: "destructive",
-        });
-        return;
-      }
+      if (messageIndex === -1) return;
 
       const message = messages[messageIndex];
 
       switch (action) {
         case 'pin':
-          const updatedMetadata: MessageMetadata = {
+          const updatedMetadata = {
             ...message.metadata,
             isPinned: !message.metadata?.isPinned
           };
           
-          const { error: pinError } = await supabase
-            .from('messages')
-            .update({
-              metadata: updatedMetadata as Json
-            })
-            .eq('id', messageId);
-
-          if (pinError) throw pinError;
+          await updateMessage(messageId, message.content, updatedMetadata);
           
           const updatedMessage = {
             ...message,
             metadata: updatedMetadata
           };
           
-          const newMessages = [...messages];
-          newMessages[messageIndex] = updatedMessage;
-          setMessages(newMessages);
-          
-          toast({
-            title: updatedMessage.metadata?.isPinned ? "Message pinned" : "Message unpinned",
-            description: "The message has been updated",
-          });
+          setMessages(messages.map(m => m.id === messageId ? updatedMessage : m));
           break;
 
         case 'edit':
-          if (!message) return;
           setEditingMessageId(messageId);
           setEditContent(message.content);
           break;
@@ -463,38 +299,22 @@ const ChatInterface = () => {
         case 'save':
           if (!editContent.trim()) return;
 
-          const editedMetadata: MessageMetadata = {
+          const editedMetadata = {
             ...message.metadata,
             isEdited: true,
             editedAt: new Date().toISOString()
           };
 
-          const { error: saveError } = await supabase
-            .from('messages')
-            .update({
-              content: editContent,
-              metadata: editedMetadata as Json
-            })
-            .eq('id', messageId);
+          await updateMessage(messageId, editContent, editedMetadata);
 
-          if (saveError) throw saveError;
-
-          const editedMessage = {
-            ...message,
-            content: editContent,
-            metadata: editedMetadata
-          };
-
-          const updatedMessages = [...messages];
-          updatedMessages[messageIndex] = editedMessage;
-          setMessages(updatedMessages);
+          setMessages(messages.map(m => 
+            m.id === messageId 
+              ? { ...m, content: editContent, metadata: editedMetadata }
+              : m
+          ));
+          
           setEditingMessageId(null);
           setEditContent('');
-
-          toast({
-            title: "Message updated",
-            description: "Your changes have been saved",
-          });
           break;
       }
     } catch (error) {
@@ -506,120 +326,6 @@ const ChatInterface = () => {
       });
     }
   };
-
-  const renderMessage = (message: Message, index: number) => (
-    <div
-      key={index}
-      className={`chat-bubble relative ${
-        message.role === 'assistant' 
-          ? 'bg-primary/10 border border-primary/20' 
-          : 'ml-auto bg-secondary/20'
-      } p-4 rounded-lg max-w-[80%] ${message.metadata?.isPinned ? 'border-l-4 border-primary' : ''} animate-fade-in`}
-    >
-      {message.role === 'assistant' && (
-        <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
-          <Badge variant="outline" className="gap-1">
-            <Brain className="w-3 h-3" />
-            {message.metadata?.model}
-          </Badge>
-          {message.metadata?.tokenMetrics && (
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="gap-1">
-                <MonitorSmartphone className="w-3 h-3" />
-                {message.metadata.tokenMetrics.inputTokens + message.metadata.tokenMetrics.outputTokens} tokens
-              </Badge>
-              <Badge variant="outline" className="gap-1">
-                <BarChart3 className="w-3 h-3" />
-                ${message.metadata.tokenMetrics.totalCost.toFixed(4)}
-              </Badge>
-            </div>
-          )}
-        </div>
-      )}
-
-      {editingMessageId === message.id ? (
-        <div className="space-y-2">
-          <textarea
-            value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            className="w-full min-h-[100px] p-2 rounded bg-background/50 border focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setEditingMessageId(null);
-                setEditContent('');
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => handleMessageAction(message.id, 'save')}
-            >
-              Save Changes
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <ReactMarkdown
-            components={{
-              h1: ({ children }) => <h1 className="text-2xl font-bold mb-4 mt-6">{children}</h1>,
-              h2: ({ children }) => <h2 className="text-xl font-bold mb-3 mt-5">{children}</h2>,
-              h3: ({ children }) => <h3 className="text-lg font-bold mb-2 mt-4">{children}</h3>,
-              p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
-              ul: ({ children }) => <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>,
-              ol: ({ children }) => <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>,
-              li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-              blockquote: ({ children }) => (
-                <blockquote className="border-l-4 border-primary/30 pl-4 italic my-4">
-                  {children}
-                </blockquote>
-              ),
-              code: ({ className, children, ...props }) => {
-                const match = /language-(\w+)/.exec(className || '');
-                return match ? (
-                  <div className="relative group">
-                    <button
-                      onClick={() => navigator.clipboard.writeText(String(children))}
-                      className="absolute right-2 top-2 p-1 rounded bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Copy code"
-                    >
-                      <Code className="w-4 h-4" />
-                    </button>
-                    <SyntaxHighlighter
-                      {...props}
-                      style={materialDark}
-                      language={match[1]}
-                      PreTag="div"
-                      className="rounded-lg !mt-2 !mb-4"
-                    >
-                      {String(children).replace(/\n$/, '')}
-                    </SyntaxHighlighter>
-                  </div>
-                ) : (
-                  <code {...props} className="bg-primary/10 rounded px-1.5 py-0.5">
-                    {children}
-                  </code>
-                );
-              }
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
-          {message.metadata?.isEdited && (
-            <div className="text-xs text-muted-foreground mt-2">
-              Edited {new Date(message.metadata.editedAt!).toLocaleDateString()}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
 
   return (
     <div className="flex h-screen">
@@ -639,122 +345,95 @@ const ChatInterface = () => {
             </div>
             
             <div className="flex items-center gap-2">
-              <ScreenshotCapture onAnalysisComplete={handleScreenshotAnalysis} />
+              <ScreenshotCapture onAnalysisComplete={(analysis) => {
+                const assistantMessage = {
+                  role: 'assistant' as const,
+                  content: `📸 Screenshot Analysis:\n\n${analysis}`,
+                  metadata: { type: 'screenshot_analysis', timestamp: new Date().toISOString() }
+                };
+                
+                setMessages(prev => [...prev, assistantMessage]);
+                
+                if (currentSession) {
+                  supabase
+                    .from('conversations')
+                    .select()
+                    .eq('session_id', currentSession.id)
+                    .single()
+                    .then(({ data: conversation }) => {
+                      if (conversation) {
+                        saveMessage(conversation.id, assistantMessage);
+                      }
+                    });
+                }
+              }} />
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={exportConversation}
+                onClick={() => {
+                  const exportData = {
+                    session: currentSession,
+                    model: selectedModel,
+                    messages: messages,
+                    exportedAt: new Date().toISOString(),
+                  };
+
+                  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `research-session-${currentSession?.id}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }}
                 title="Export Conversation"
               >
                 <Download className="w-4 h-4" />
               </Button>
               
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-2">
-                    <Settings className="w-4 h-4" />
-                    {selectedModel.name}
-                    <ChevronDown className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[300px]">
-                  {modelOptions.map((model) => (
-                    <DropdownMenuItem
-                      key={model.name}
-                      onClick={() => setSelectedModel(model)}
-                      className="flex flex-col items-start py-2 gap-1"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="font-medium">{model.name}</span>
-                        <Badge variant="secondary">{model.provider}</Badge>
-                      </div>
-                      <span className="text-xs text-muted-foreground">{model.description}</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {model.capabilities.map((capability) => (
-                          <Badge key={capability} variant="outline" className="text-xs">
-                            {capability}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        ${model.costPer1kTokens}/1k tokens • Max {model.maxTokens} tokens
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <div className="p-2 text-xs text-muted-foreground">
-                    <div className="flex justify-between mb-1">
-                      <span>Total Tokens Used:</span>
-                      <span>{totalTokens.inputTokens + totalTokens.outputTokens}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Total Cost:</span>
-                      <span>${totalTokens.totalCost.toFixed(4)}</span>
-                    </div>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <ModelSelector
+                selectedModel={selectedModel}
+                modelOptions={modelOptions}
+                onModelSelect={setSelectedModel}
+                totalTokens={totalTokens}
+              />
             </div>
           </div>
         </div>
 
         <ScrollArea className="flex-1 p-4 space-y-4">
-          {messages.map((message, index) => renderMessage(message, index))}
+          {messages.map((message, index) => (
+            <ChatMessage
+              key={index}
+              message={message}
+              isEditing={editingMessageId === message.id}
+              editContent={editContent}
+              onEditChange={setEditContent}
+              onSaveEdit={() => handleMessageAction(message.id, 'save')}
+              onCancelEdit={() => {
+                setEditingMessageId(null);
+                setEditContent('');
+              }}
+            />
+          ))}
           {isStreaming && streamingContent && (
-            <div className="chat-bubble relative bg-primary/10 border border-primary/20 p-4 rounded-lg max-w-[80%] animate-fade-in">
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="outline" className="gap-1">
-                  <Brain className="w-3 h-3" />
-                  {selectedModel.name}
-                </Badge>
-                <div className="animate-pulse">Generating...</div>
-              </div>
-              <ReactMarkdown
-                components={{
-                  h1: ({ children }) => <h1 className="text-2xl font-bold mb-4 mt-6">{children}</h1>,
-                  h2: ({ children }) => <h2 className="text-xl font-bold mb-3 mt-5">{children}</h2>,
-                  h3: ({ children }) => <h3 className="text-lg font-bold mb-2 mt-4">{children}</h3>,
-                  p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
-                  ul: ({ children }) => <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>,
-                  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-primary/30 pl-4 italic my-4">
-                      {children}
-                    </blockquote>
-                  ),
-                  code: ({ className, children, ...props }) => {
-                    const match = /language-(\w+)/.exec(className || '');
-                    return match ? (
-                      <div className="relative group">
-                        <button
-                          onClick={() => navigator.clipboard.writeText(String(children))}
-                          className="absolute right-2 top-2 p-1 rounded bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Copy code"
-                        >
-                          <Code className="w-4 h-4" />
-                        </button>
-                        <SyntaxHighlighter
-                          {...props}
-                          style={materialDark}
-                          language={match[1]}
-                          PreTag="div"
-                          className="rounded-lg !mt-2 !mb-4"
-                        >
-                          {String(children).replace(/\n$/, '')}
-                        </SyntaxHighlighter>
-                      </div>
-                    ) : (
-                      <code {...props} className="bg-primary/10 rounded px-1.5 py-0.5">
-                        {children}
-                      </code>
-                    );
-                  }
-                }}
-              >
-                {streamingContent}
-              </ReactMarkdown>
-            </div>
+            <ChatMessage
+              message={{
+                role: 'assistant',
+                content: streamingContent,
+                metadata: {
+                  model: selectedModel.name,
+                  timestamp: new Date().toISOString()
+                }
+              }}
+              isEditing={false}
+              editContent=""
+              onEditChange={() => {}}
+              onSaveEdit={() => {}}
+              onCancelEdit={() => {}}
+            />
           )}
         </ScrollArea>
         
@@ -796,7 +475,7 @@ const ChatInterface = () => {
                 onClick={handleSend}
                 disabled={isLoading}
               >
-                {isLoading ? 'Thinking...' : <Send className="w-4 h-4" />}
+                {isLoading ? 'Thinking...' : 'Send'}
               </Button>
             </div>
           </div>
