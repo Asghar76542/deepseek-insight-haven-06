@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Download } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { ScreenshotCapture } from '@/components/ScreenshotCapture';
 import { ResearchSession } from '@/types/research';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from 'uuid';
 import { ModelSelector } from './chat/ModelSelector';
 import { ChatMessage } from './chat/ChatMessage';
 import { Message, ModelOption, TokenMetrics } from '@/types/chat';
@@ -283,12 +285,13 @@ const ChatInterface = () => {
           
           await updateMessage(messageId, message.content, updatedMetadata);
           
-          const updatedMessage = {
-            ...message,
-            metadata: updatedMetadata
-          };
-          
-          setMessages(messages.map(m => m.id === messageId ? updatedMessage : m));
+          setMessages(prevMessages => 
+            prevMessages.map(m => 
+              m.id === messageId 
+                ? { ...m, metadata: updatedMetadata }
+                : m
+            )
+          );
           break;
 
         case 'edit':
@@ -307,11 +310,13 @@ const ChatInterface = () => {
 
           await updateMessage(messageId, editContent, editedMetadata);
 
-          setMessages(messages.map(m => 
-            m.id === messageId 
-              ? { ...m, content: editContent, metadata: editedMetadata }
-              : m
-          ));
+          setMessages(prevMessages => 
+            prevMessages.map(m => 
+              m.id === messageId 
+                ? { ...m, content: editContent, metadata: editedMetadata }
+                : m
+            )
+          );
           
           setEditingMessageId(null);
           setEditContent('');

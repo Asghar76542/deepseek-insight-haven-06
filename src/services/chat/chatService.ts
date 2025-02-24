@@ -1,8 +1,14 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Message, TokenMetrics } from "@/types/chat";
+import { Message, TokenMetrics, TokenMetricsJson } from "@/types/chat";
 import { v4 as uuidv4 } from 'uuid';
 import { Json } from '@/integrations/supabase/types';
+
+const convertTokenMetricsToJson = (metrics: TokenMetrics): TokenMetricsJson => ({
+  input_tokens: metrics.inputTokens,
+  output_tokens: metrics.outputTokens,
+  total_cost: metrics.totalCost
+});
 
 export const saveMessage = async (conversationId: string, message: Message): Promise<string | undefined> => {
   try {
@@ -13,7 +19,12 @@ export const saveMessage = async (conversationId: string, message: Message): Pro
       role: message.role,
       content: message.content,
       model_name: message.metadata?.model || '',
-      metadata: message.metadata as Json
+      metadata: {
+        ...message.metadata,
+        tokenMetricsJson: message.metadata?.tokenMetrics 
+          ? convertTokenMetricsToJson(message.metadata.tokenMetrics)
+          : undefined
+      } as Json
     };
 
     const { data, error } = await supabase
@@ -41,12 +52,17 @@ export const calculateTokenMetrics = (text: string): TokenMetrics => {
   };
 };
 
-export const updateMessage = async (messageId: string, content: string, metadata: Json) => {
+export const updateMessage = async (messageId: string, content: string, metadata: MessageMetadata) => {
   const { error } = await supabase
     .from('messages')
     .update({
       content,
-      metadata
+      metadata: {
+        ...metadata,
+        tokenMetricsJson: metadata.tokenMetrics 
+          ? convertTokenMetricsToJson(metadata.tokenMetrics)
+          : undefined
+      } as Json
     })
     .eq('id', messageId);
 
