@@ -10,9 +10,41 @@ const convertTokenMetricsToJson = (metrics: TokenMetrics): TokenMetricsJson => (
   total_cost: metrics.totalCost
 });
 
+const analyzeMessage = async (content: string) => {
+  try {
+    const response = await fetch(
+      'https://sqxyqqupoifcxejykntn.supabase.co/functions/v1/analyze-message',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ content })
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Analysis failed');
+    }
+
+    const analysis = await response.json();
+    return analysis;
+  } catch (error) {
+    console.error('Error analyzing message:', error);
+    return {
+      sentiment: 0.5,
+      complexity: 0.5,
+      keyTerms: []
+    };
+  }
+};
+
 export const saveMessage = async (conversationId: string, message: Message): Promise<string | undefined> => {
   try {
     const messageId = uuidv4();
+    const analysis = await analyzeMessage(message.content);
+
     const messageData = {
       id: messageId,
       conversation_id: conversationId,
@@ -23,7 +55,10 @@ export const saveMessage = async (conversationId: string, message: Message): Pro
         ...message.metadata,
         tokenMetricsJson: message.metadata?.tokenMetrics 
           ? convertTokenMetricsToJson(message.metadata.tokenMetrics)
-          : undefined
+          : undefined,
+        sentiment: analysis.sentiment,
+        complexity: analysis.complexity,
+        keyTerms: analysis.keyTerms
       } as Json
     };
 
@@ -53,6 +88,8 @@ export const calculateTokenMetrics = (text: string): TokenMetrics => {
 };
 
 export const updateMessage = async (messageId: string, content: string, metadata: MessageMetadata) => {
+  const analysis = await analyzeMessage(content);
+  
   const { error } = await supabase
     .from('messages')
     .update({
@@ -61,7 +98,10 @@ export const updateMessage = async (messageId: string, content: string, metadata
         ...metadata,
         tokenMetricsJson: metadata.tokenMetrics 
           ? convertTokenMetricsToJson(metadata.tokenMetrics)
-          : undefined
+          : undefined,
+        sentiment: analysis.sentiment,
+        complexity: analysis.complexity,
+        keyTerms: analysis.keyTerms
       } as Json
     })
     .eq('id', messageId);
