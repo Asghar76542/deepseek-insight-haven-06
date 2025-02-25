@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Message } from '@/types/chat';
+import { Message, StorageMessageMetadata } from '@/types/chat';
 import { Progress } from "@/components/ui/progress";
 
 interface ChatMessageProps {
@@ -26,55 +26,58 @@ export const ChatMessage = ({
   onSaveEdit,
   onCancelEdit
 }: ChatMessageProps) => {
+  // Cast metadata to StorageMessageMetadata to access token_metrics
+  const metadata = message.metadata as unknown as StorageMessageMetadata;
+
   return (
     <div
       className={`chat-bubble relative ${
         message.role === 'assistant' 
           ? 'bg-primary/10 border border-primary/20' 
           : 'ml-auto bg-secondary/20'
-      } p-4 rounded-lg max-w-[80%] ${message.metadata?.isPinned ? 'border-l-4 border-primary' : ''} animate-fade-in`}
+      } p-4 rounded-lg max-w-[80%] ${metadata?.isPinned ? 'border-l-4 border-primary' : ''} animate-fade-in`}
     >
       {message.role === 'assistant' && (
         <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
           <Badge variant="outline" className="gap-1">
             <Brain className="w-3 h-3" />
-            {message.metadata?.model}
+            {metadata?.model}
           </Badge>
-          {message.metadata?.tokenMetricsJson && (
+          {metadata?.token_metrics && (
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="gap-1">
                 <MonitorSmartphone className="w-3 h-3" />
-                {message.metadata.tokenMetricsJson.input_tokens + message.metadata.tokenMetricsJson.output_tokens} tokens
+                {metadata.token_metrics.input_tokens + metadata.token_metrics.output_tokens} tokens
               </Badge>
               <Badge variant="outline" className="gap-1">
                 <BarChart3 className="w-3 h-3" />
-                ${message.metadata.tokenMetricsJson.total_cost.toFixed(4)}
+                ${metadata.token_metrics.total_cost.toFixed(4)}
               </Badge>
             </div>
           )}
-          {message.metadata?.sentiment !== undefined && (
+          {metadata?.sentiment !== undefined && (
             <Badge variant="outline" className="gap-1">
               <TrendingUp className="w-3 h-3" />
-              Sentiment: {(message.metadata.sentiment * 100).toFixed(0)}%
+              Sentiment: {(metadata.sentiment * 100).toFixed(0)}%
               <div className="w-16 ml-1">
-                <Progress value={message.metadata.sentiment * 100} 
+                <Progress value={metadata.sentiment * 100} 
                   className={`h-1.5 ${
-                    message.metadata.sentiment > 0.6 ? 'bg-green-500' : 
-                    message.metadata.sentiment < 0.4 ? 'bg-red-500' : 'bg-yellow-500'
+                    metadata.sentiment > 0.6 ? 'bg-green-500' : 
+                    metadata.sentiment < 0.4 ? 'bg-red-500' : 'bg-yellow-500'
                   }`} 
                 />
               </div>
             </Badge>
           )}
-          {message.metadata?.complexity !== undefined && (
+          {metadata?.complexity !== undefined && (
             <Badge variant="outline" className="gap-1">
               <Lightbulb className="w-3 h-3" />
-              Complexity: {(message.metadata.complexity * 100).toFixed(0)}%
+              Complexity: {(metadata.complexity * 100).toFixed(0)}%
               <div className="w-16 ml-1">
-                <Progress value={message.metadata.complexity * 100} 
+                <Progress value={metadata.complexity * 100} 
                   className={`h-1.5 ${
-                    message.metadata.complexity > 0.7 ? 'bg-red-500' : 
-                    message.metadata.complexity < 0.3 ? 'bg-green-500' : 'bg-yellow-500'
+                    metadata.complexity > 0.7 ? 'bg-red-500' : 
+                    metadata.complexity < 0.3 ? 'bg-green-500' : 'bg-yellow-500'
                   }`} 
                 />
               </div>

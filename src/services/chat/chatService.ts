@@ -1,13 +1,13 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Message, TokenMetrics, TokenMetricsJson, MessageMetadata } from "@/types/chat";
+import { Message, TokenMetrics, RuntimeMessageMetadata, StorageMessageMetadata } from "@/types/chat";
 import { v4 as uuidv4 } from 'uuid';
 import { Json } from '@/integrations/supabase/types';
 
-const convertTokenMetricsToJson = (metrics: TokenMetrics): TokenMetricsJson => ({
-  input_tokens: metrics.inputTokens as Json,
-  output_tokens: metrics.outputTokens as Json,
-  total_cost: metrics.totalCost as Json
+const convertTokenMetricsForStorage = (metrics: TokenMetrics) => ({
+  input_tokens: metrics.inputTokens,
+  output_tokens: metrics.outputTokens,
+  total_cost: metrics.totalCost
 });
 
 const analyzeMessage = async (content: string) => {
@@ -44,7 +44,19 @@ export const saveMessage = async (conversationId: string, message: Message): Pro
   try {
     const messageId = uuidv4();
     const analysis = await analyzeMessage(message.content);
-    const tokenMetricsJson = message.metadata?.tokenMetrics ? convertTokenMetricsToJson(message.metadata.tokenMetrics) : undefined;
+    
+    // Prepare storage metadata
+    const storageMetadata: StorageMessageMetadata = {
+      ...message.metadata,
+      sentiment: analysis.sentiment,
+      complexity: analysis.complexity,
+      keyTerms: analysis.keyTerms,
+    };
+
+    // Add token metrics if they exist
+    if (message.metadata?.tokenMetrics) {
+      storageMetadata.token_metrics = convertTokenMetricsForStorage(message.metadata.tokenMetrics);
+    }
 
     const messageData = {
       id: messageId,
@@ -52,13 +64,7 @@ export const saveMessage = async (conversationId: string, message: Message): Pro
       role: message.role,
       content: message.content,
       model_name: message.metadata?.model || '',
-      metadata: {
-        ...message.metadata,
-        sentiment: analysis.sentiment as Json,
-        complexity: analysis.complexity as Json,
-        keyTerms: analysis.keyTerms as Json,
-        token_metrics: tokenMetricsJson
-      } as Json
+      metadata: storageMetadata as unknown as Json
     };
 
     const { data, error } = await supabase
@@ -86,23 +92,27 @@ export const calculateTokenMetrics = (text: string): TokenMetrics => {
   };
 };
 
-export const updateMessage = async (messageId: string, content: string, metadata: MessageMetadata) => {
+export const updateMessage = async (messageId: string, content: string, metadata: RuntimeMessageMetadata) => {
   const analysis = await analyzeMessage(content);
-  const tokenMetricsJson = metadata.tokenMetrics ? convertTokenMetricsToJson(metadata.tokenMetrics) : undefined;
   
-  const updatedMetadata = {
+  // Prepare storage metadata
+  const storageMetadata: StorageMessageMetadata = {
     ...metadata,
-    sentiment: analysis.sentiment as Json,
-    complexity: analysis.complexity as Json,
-    keyTerms: analysis.keyTerms as Json,
-    token_metrics: tokenMetricsJson
-  } as Json;
+    sentiment: analysis.sentiment,
+    complexity: analysis.complexity,
+    keyTerms: analysis.keyTerms,
+  };
+
+  // Add token metrics if they exist
+  if (metadata.tokenMetrics) {
+    storageMetadata.token_metrics = convertTokenMetricsForStorage(metadata.tokenMetrics);
+  }
 
   const { error } = await supabase
     .from('messages')
     .update({
       content,
-      metadata: updatedMetadata
+      metadata: storageMetadata as unknown as Json
     })
     .eq('id', messageId);
 
