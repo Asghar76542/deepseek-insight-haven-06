@@ -45,17 +45,20 @@ export const saveMessage = async (conversationId: string, message: Message): Pro
     const messageId = uuidv4();
     const analysis = await analyzeMessage(message.content);
     
+    // Create storage metadata without runtime properties
+    const { tokenMetrics, ...baseMetadata } = message.metadata || {};
+    
     // Prepare storage metadata
     const storageMetadata: StorageMessageMetadata = {
-      ...message.metadata,
+      ...baseMetadata,
       sentiment: analysis.sentiment,
       complexity: analysis.complexity,
       keyTerms: analysis.keyTerms,
     };
 
     // Add token metrics if they exist
-    if (message.metadata?.tokenMetrics) {
-      storageMetadata.token_metrics = convertTokenMetricsForStorage(message.metadata.tokenMetrics);
+    if (tokenMetrics) {
+      storageMetadata.token_metrics = convertTokenMetricsForStorage(tokenMetrics);
     }
 
     const messageData = {
@@ -95,17 +98,20 @@ export const calculateTokenMetrics = (text: string): TokenMetrics => {
 export const updateMessage = async (messageId: string, content: string, metadata: RuntimeMessageMetadata) => {
   const analysis = await analyzeMessage(content);
   
+  // Create storage metadata without runtime properties
+  const { tokenMetrics, ...baseMetadata } = metadata;
+  
   // Prepare storage metadata
   const storageMetadata: StorageMessageMetadata = {
-    ...metadata,
+    ...baseMetadata,
     sentiment: analysis.sentiment,
     complexity: analysis.complexity,
     keyTerms: analysis.keyTerms,
   };
 
   // Add token metrics if they exist
-  if (metadata.tokenMetrics) {
-    storageMetadata.token_metrics = convertTokenMetricsForStorage(metadata.tokenMetrics);
+  if (tokenMetrics) {
+    storageMetadata.token_metrics = convertTokenMetricsForStorage(tokenMetrics);
   }
 
   const { error } = await supabase
