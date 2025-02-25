@@ -1,7 +1,5 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { Configuration, OpenAIApi } from 'https://esm.sh/openai@3.1.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,6 +47,7 @@ serve(async (req) => {
       },
     )
   } catch (error) {
+    console.error('Error in analyze-message function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
@@ -59,7 +58,6 @@ serve(async (req) => {
   }
 })
 
-// Sentiment analysis implementation
 function analyzeSentiment(text: string): number {
   const positiveWords = new Set([
     'good', 'great', 'excellent', 'positive', 'amazing', 'wonderful', 'fantastic',
@@ -73,7 +71,7 @@ function analyzeSentiment(text: string): number {
 
   const words = text.toLowerCase().match(/\b\w+\b/g) || []
   let score = 0
-  let totalWords = words.length
+  let totalWords = words.length || 1 // Prevent division by zero
 
   words.forEach(word => {
     if (positiveWords.has(word)) score += 1
@@ -84,15 +82,14 @@ function analyzeSentiment(text: string): number {
   return (score / totalWords + 1) / 2
 }
 
-// Complexity analysis implementation
 function analyzeComplexity(text: string): number {
   // Word length complexity
   const words = text.match(/\b\w+\b/g) || []
-  const avgWordLength = words.reduce((sum, word) => sum + word.length, 0) / words.length
+  const avgWordLength = words.length ? words.reduce((sum, word) => sum + word.length, 0) / words.length : 0
 
   // Sentence length complexity
   const sentences = text.split(/[.!?]+/).filter(Boolean)
-  const avgSentenceLength = words.length / sentences.length
+  const avgSentenceLength = sentences.length ? words.length / sentences.length : 0
 
   // Technical term complexity
   const technicalTerms = new Set([
@@ -108,14 +105,13 @@ function analyzeComplexity(text: string): number {
   const weightedScore = (
     (avgWordLength / 12) * 0.3 +
     (avgSentenceLength / 30) * 0.3 +
-    (technicalTermCount / words.length) * 0.2 +
+    (technicalTermCount / words.length || 0) * 0.2 +
     (codeBlockCount > 0 ? 0.2 : 0)
   )
 
   return Math.min(Math.max(weightedScore, 0), 1)
 }
 
-// Key terms extraction
 function extractKeyTerms(text: string): string[] {
   const words = text.toLowerCase().match(/\b\w+\b/g) || []
   const wordFreq = new Map<string, number>()

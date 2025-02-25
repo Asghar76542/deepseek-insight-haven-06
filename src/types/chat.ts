@@ -20,9 +20,10 @@ export interface MessageMetadata {
   editedAt?: string;
   model?: string;
   timestamp?: string;
-  tokenMetricsJson?: TokenMetricsJson;
+  tokenMetrics?: TokenMetrics;
   sentiment?: number;
   complexity?: number;
+  keyTerms?: string[];
   [key: string]: Json | undefined;
 }
 

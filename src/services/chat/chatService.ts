@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Message, TokenMetrics, TokenMetricsJson } from "@/types/chat";
+import { Message, TokenMetrics, TokenMetricsJson, MessageMetadata } from "@/types/chat";
 import { v4 as uuidv4 } from 'uuid';
 import { Json } from '@/integrations/supabase/types';
 
@@ -44,6 +44,7 @@ export const saveMessage = async (conversationId: string, message: Message): Pro
   try {
     const messageId = uuidv4();
     const analysis = await analyzeMessage(message.content);
+    const tokenMetrics = message.metadata?.tokenMetrics ? convertTokenMetricsToJson(message.metadata.tokenMetrics) : undefined;
 
     const messageData = {
       id: messageId,
@@ -53,12 +54,10 @@ export const saveMessage = async (conversationId: string, message: Message): Pro
       model_name: message.metadata?.model || '',
       metadata: {
         ...message.metadata,
-        tokenMetricsJson: message.metadata?.tokenMetrics 
-          ? convertTokenMetricsToJson(message.metadata.tokenMetrics)
-          : undefined,
         sentiment: analysis.sentiment,
         complexity: analysis.complexity,
-        keyTerms: analysis.keyTerms
+        keyTerms: analysis.keyTerms,
+        tokenMetrics
       } as Json
     };
 
@@ -89,6 +88,7 @@ export const calculateTokenMetrics = (text: string): TokenMetrics => {
 
 export const updateMessage = async (messageId: string, content: string, metadata: MessageMetadata) => {
   const analysis = await analyzeMessage(content);
+  const tokenMetrics = metadata.tokenMetrics ? convertTokenMetricsToJson(metadata.tokenMetrics) : undefined;
   
   const { error } = await supabase
     .from('messages')
@@ -96,12 +96,10 @@ export const updateMessage = async (messageId: string, content: string, metadata
       content,
       metadata: {
         ...metadata,
-        tokenMetricsJson: metadata.tokenMetrics 
-          ? convertTokenMetricsToJson(metadata.tokenMetrics)
-          : undefined,
         sentiment: analysis.sentiment,
         complexity: analysis.complexity,
-        keyTerms: analysis.keyTerms
+        keyTerms: analysis.keyTerms,
+        tokenMetrics
       } as Json
     })
     .eq('id', messageId);
