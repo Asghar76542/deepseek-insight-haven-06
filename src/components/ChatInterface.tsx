@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import { ModelSelector } from './chat/ModelSelector';
 import { ChatMessage } from './chat/ChatMessage';
-import { Message, ModelOption, TokenMetrics } from '@/types/chat';
+import { Message, ModelOption, TokenMetrics, RuntimeMessageMetadata } from '@/types/chat';
 import { saveMessage, calculateTokenMetrics, updateMessage } from '@/services/chat/chatService';
 
 const modelOptions: ModelOption[] = [
@@ -104,9 +104,13 @@ const ChatInterface = () => {
 
       setCurrentSession(session);
 
-      const initialMessage = {
-        role: 'assistant' as const,
+      const initialMessage: Message = {
+        role: 'assistant',
         content: `How can I help with your research today? I'm using ${selectedModel.name} from ${selectedModel.provider}.`,
+        metadata: {
+          model: selectedModel.name,
+          timestamp: new Date().toISOString(),
+        }
       };
       
       await saveMessage(conversation.id, initialMessage);
@@ -144,7 +148,11 @@ const ChatInterface = () => {
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
         content: msg.content,
-        metadata: msg.metadata as Message['metadata']
+        metadata: {
+          ...msg.metadata,
+          model: msg.model_name,
+          timestamp: new Date(msg.created_at).toISOString(),
+        } as RuntimeMessageMetadata
       }));
       setMessages(typedMessages);
     } catch (error) {
@@ -171,11 +179,7 @@ const ChatInterface = () => {
         content: input,
         metadata: {
           timestamp: new Date().toISOString(),
-          tokenMetrics: {
-            inputTokens: inputMetrics.inputTokens,
-            outputTokens: inputMetrics.outputTokens,
-            totalCost: inputMetrics.totalCost
-          }
+          tokenMetrics: inputMetrics
         }
       };
 
@@ -232,13 +236,7 @@ const ChatInterface = () => {
         metadata: {
           model: selectedModel.name,
           timestamp: new Date().toISOString(),
-          tokenMetrics: {
-            inputTokens: outputMetrics.inputTokens,
-            outputTokens: outputMetrics.outputTokens,
-            totalCost: outputMetrics.totalCost
-          },
-          sentiment: Math.random() * 100,
-          complexity: Math.random() * 100
+          tokenMetrics: outputMetrics
         }
       };
 
@@ -278,7 +276,7 @@ const ChatInterface = () => {
 
       switch (action) {
         case 'pin':
-          const updatedMetadata = {
+          const updatedMetadata: RuntimeMessageMetadata = {
             ...message.metadata,
             isPinned: !message.metadata?.isPinned
           };
@@ -302,7 +300,7 @@ const ChatInterface = () => {
         case 'save':
           if (!editContent.trim()) return;
 
-          const editedMetadata = {
+          const editedMetadata: RuntimeMessageMetadata = {
             ...message.metadata,
             isEdited: true,
             editedAt: new Date().toISOString()

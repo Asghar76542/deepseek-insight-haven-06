@@ -1,130 +1,77 @@
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-interface AnalysisResult {
-  sentiment: number;
-  complexity: number;
-  keyTerms: string[];
-}
+};
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { content } = await req.json()
+    const { content } = await req.json();
 
-    if (!content) {
-      throw new Error('No content provided')
-    }
-
-    // Basic sentiment analysis using word lists and patterns
-    const sentimentAnalysis = analyzeSentiment(content)
+    // Basic sentiment analysis (placeholder for demo)
+    const words = content.toLowerCase().split(/\s+/);
+    const positiveWords = ['good', 'great', 'excellent', 'amazing', 'wonderful', 'happy', 'love', 'best'];
+    const negativeWords = ['bad', 'terrible', 'awful', 'horrible', 'sad', 'hate', 'worst'];
     
-    // Complexity analysis using multiple factors
-    const complexityAnalysis = analyzeComplexity(content)
+    let sentimentScore = 0.5; // neutral default
+    let matches = 0;
     
-    // Extract key terms
-    const keyTerms = extractKeyTerms(content)
+    words.forEach(word => {
+      if (positiveWords.includes(word)) {
+        sentimentScore += 0.1;
+        matches++;
+      } else if (negativeWords.includes(word)) {
+        sentimentScore -= 0.1;
+        matches++;
+      }
+    });
 
-    const result: AnalysisResult = {
-      sentiment: sentimentAnalysis,
-      complexity: complexityAnalysis,
-      keyTerms: keyTerms,
-    }
+    // Normalize sentiment score between 0 and 1
+    sentimentScore = Math.max(0, Math.min(1, sentimentScore));
+
+    // Calculate complexity based on various factors
+    const complexity = Math.min(1, Math.max(0, 
+      (words.length / 100) + // Length factor
+      (new Set(words).size / words.length) + // Vocabulary diversity
+      (content.split('.').length / 10) // Sentence structure
+    ) / 3);
+
+    // Extract key terms (simple implementation)
+    const keyTerms = [...new Set(words)]
+      .filter(word => word.length > 4)
+      .slice(0, 5);
 
     return new Response(
-      JSON.stringify(result),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      },
-    )
+      JSON.stringify({
+        sentiment: sentimentScore,
+        complexity: complexity,
+        keyTerms: keyTerms
+      }),
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
   } catch (error) {
     console.error('Error in analyze-message function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      },
-    )
+      { 
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
   }
-})
-
-function analyzeSentiment(text: string): number {
-  const positiveWords = new Set([
-    'good', 'great', 'excellent', 'positive', 'amazing', 'wonderful', 'fantastic',
-    'helpful', 'beneficial', 'success', 'improvement', 'resolved', 'solved'
-  ])
-
-  const negativeWords = new Set([
-    'bad', 'poor', 'terrible', 'negative', 'horrible', 'awful', 'wrong',
-    'issue', 'problem', 'error', 'fail', 'broken', 'complicated'
-  ])
-
-  const words = text.toLowerCase().match(/\b\w+\b/g) || []
-  let score = 0
-  let totalWords = words.length || 1 // Prevent division by zero
-
-  words.forEach(word => {
-    if (positiveWords.has(word)) score += 1
-    if (negativeWords.has(word)) score -= 1
-  })
-
-  // Normalize to range 0-1
-  return (score / totalWords + 1) / 2
-}
-
-function analyzeComplexity(text: string): number {
-  // Word length complexity
-  const words = text.match(/\b\w+\b/g) || []
-  const avgWordLength = words.length ? words.reduce((sum, word) => sum + word.length, 0) / words.length : 0
-
-  // Sentence length complexity
-  const sentences = text.split(/[.!?]+/).filter(Boolean)
-  const avgSentenceLength = sentences.length ? words.length / sentences.length : 0
-
-  // Technical term complexity
-  const technicalTerms = new Set([
-    'algorithm', 'implementation', 'function', 'database', 'api',
-    'interface', 'component', 'architecture', 'framework', 'protocol'
-  ])
-  const technicalTermCount = words.filter(word => technicalTerms.has(word.toLowerCase())).length
-
-  // Code block complexity
-  const codeBlockCount = (text.match(/```[\s\S]*?```/g) || []).length
-
-  // Calculate final complexity score (0-1)
-  const weightedScore = (
-    (avgWordLength / 12) * 0.3 +
-    (avgSentenceLength / 30) * 0.3 +
-    (technicalTermCount / words.length || 0) * 0.2 +
-    (codeBlockCount > 0 ? 0.2 : 0)
-  )
-
-  return Math.min(Math.max(weightedScore, 0), 1)
-}
-
-function extractKeyTerms(text: string): string[] {
-  const words = text.toLowerCase().match(/\b\w+\b/g) || []
-  const wordFreq = new Map<string, number>()
-  const stopWords = new Set(['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have'])
-
-  words.forEach(word => {
-    if (!stopWords.has(word)) {
-      wordFreq.set(word, (wordFreq.get(word) || 0) + 1)
-    }
-  })
-
-  return Array.from(wordFreq.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([word]) => word)
-}
+});
