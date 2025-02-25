@@ -9,9 +9,7 @@ export interface TokenMetrics {
 
 // Convert TokenMetrics to a JSON-compatible format for storage
 export interface TokenMetricsJson {
-  input_tokens: number;
-  output_tokens: number;
-  total_cost: number;
+  [key: string]: Json;
 }
 
 export interface MessageMetadata {
@@ -20,7 +18,7 @@ export interface MessageMetadata {
   editedAt?: string;
   model?: string;
   timestamp?: string;
-  tokenMetricsJson?: TokenMetricsJson; // Changed from tokenMetrics to tokenMetricsJson
+  tokenMetrics?: TokenMetrics;
   sentiment?: number;
   complexity?: number;
   keyTerms?: string[];
