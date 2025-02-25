@@ -44,7 +44,15 @@ export const saveMessage = async (conversationId: string, message: Message): Pro
   try {
     const messageId = uuidv4();
     const analysis = await analyzeMessage(message.content);
-    const tokenMetrics = message.metadata?.tokenMetrics ? convertTokenMetricsToJson(message.metadata.tokenMetrics) : undefined;
+    const tokenMetricsJson = message.metadata?.tokenMetrics ? convertTokenMetricsToJson(message.metadata.tokenMetrics) : undefined;
+
+    const metadata: MessageMetadata = {
+      ...message.metadata,
+      sentiment: analysis.sentiment,
+      complexity: analysis.complexity,
+      keyTerms: analysis.keyTerms,
+      tokenMetricsJson // Store as tokenMetricsJson instead of tokenMetrics
+    };
 
     const messageData = {
       id: messageId,
@@ -52,13 +60,7 @@ export const saveMessage = async (conversationId: string, message: Message): Pro
       role: message.role,
       content: message.content,
       model_name: message.metadata?.model || '',
-      metadata: {
-        ...message.metadata,
-        sentiment: analysis.sentiment,
-        complexity: analysis.complexity,
-        keyTerms: analysis.keyTerms,
-        tokenMetrics
-      } as Json
+      metadata: metadata as Json
     };
 
     const { data, error } = await supabase
@@ -88,19 +90,21 @@ export const calculateTokenMetrics = (text: string): TokenMetrics => {
 
 export const updateMessage = async (messageId: string, content: string, metadata: MessageMetadata) => {
   const analysis = await analyzeMessage(content);
-  const tokenMetrics = metadata.tokenMetrics ? convertTokenMetricsToJson(metadata.tokenMetrics) : undefined;
+  const tokenMetricsJson = metadata.tokenMetrics ? convertTokenMetricsToJson(metadata.tokenMetrics) : undefined;
   
+  const updatedMetadata: MessageMetadata = {
+    ...metadata,
+    sentiment: analysis.sentiment,
+    complexity: analysis.complexity,
+    keyTerms: analysis.keyTerms,
+    tokenMetricsJson // Store as tokenMetricsJson instead of tokenMetrics
+  };
+
   const { error } = await supabase
     .from('messages')
     .update({
       content,
-      metadata: {
-        ...metadata,
-        sentiment: analysis.sentiment,
-        complexity: analysis.complexity,
-        keyTerms: analysis.keyTerms,
-        tokenMetrics
-      } as Json
+      metadata: updatedMetadata as Json
     })
     .eq('id', messageId);
 
