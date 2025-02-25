@@ -149,9 +149,9 @@ const ChatInterface = () => {
         role: msg.role as 'user' | 'assistant',
         content: msg.content,
         metadata: {
-          ...msg.metadata,
           model: msg.model_name,
           timestamp: new Date(msg.created_at).toISOString(),
+          ...(msg.metadata as RuntimeMessageMetadata || {})
         } as RuntimeMessageMetadata
       }));
       setMessages(typedMessages);
