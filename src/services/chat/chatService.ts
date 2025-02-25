@@ -18,7 +18,7 @@ const analyzeMessage = async (content: string) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+          'Authorization': `Bearer ${supabase.auth.getSession()?.access_token}`
         },
         body: JSON.stringify({ content })
       }
@@ -67,7 +67,7 @@ export const saveMessage = async (conversationId: string, message: Message): Pro
       role: message.role,
       content: message.content,
       model_name: message.metadata?.model || '',
-      metadata: storageMetadata as unknown as Json
+      metadata: storageMetadata as Json
     };
 
     const { data, error } = await supabase
@@ -96,31 +96,36 @@ export const calculateTokenMetrics = (text: string): TokenMetrics => {
 };
 
 export const updateMessage = async (messageId: string, content: string, metadata: RuntimeMessageMetadata) => {
-  const analysis = await analyzeMessage(content);
-  
-  // Create storage metadata without runtime properties
-  const { tokenMetrics, ...baseMetadata } = metadata;
-  
-  // Prepare storage metadata
-  const storageMetadata: StorageMessageMetadata = {
-    ...baseMetadata,
-    sentiment: analysis.sentiment,
-    complexity: analysis.complexity,
-    keyTerms: analysis.keyTerms,
-  };
+  try {
+    const analysis = await analyzeMessage(content);
+    
+    // Create storage metadata without runtime properties
+    const { tokenMetrics, ...baseMetadata } = metadata;
+    
+    // Prepare storage metadata
+    const storageMetadata: StorageMessageMetadata = {
+      ...baseMetadata,
+      sentiment: analysis.sentiment,
+      complexity: analysis.complexity,
+      keyTerms: analysis.keyTerms,
+    };
 
-  // Add token metrics if they exist
-  if (tokenMetrics) {
-    storageMetadata.token_metrics = convertTokenMetricsForStorage(tokenMetrics);
+    // Add token metrics if they exist
+    if (tokenMetrics) {
+      storageMetadata.token_metrics = convertTokenMetricsForStorage(tokenMetrics);
+    }
+
+    const { error } = await supabase
+      .from('messages')
+      .update({
+        content,
+        metadata: storageMetadata as Json
+      })
+      .eq('id', messageId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating message:', error);
+    throw error;
   }
-
-  const { error } = await supabase
-    .from('messages')
-    .update({
-      content,
-      metadata: storageMetadata as unknown as Json
-    })
-    .eq('id', messageId);
-
-  if (error) throw error;
 };
